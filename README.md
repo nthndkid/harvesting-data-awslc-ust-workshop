@@ -18,15 +18,27 @@ for the right data type.
 
 ## Tech Stack
 
-- **Frontend** — Vue.js (Vite)
-- **Backend** — Hono.js (Bun)
-- **Database** — PostgreSQL via Amazon RDS
-- **File Storage** — Amazon S3
-- **Logging** — Amazon DynamoDB
+### Backend
+- **Hono.js** — lightweight web framework
+- **Drizzle ORM** — type-safe ORM + migrations for PostgreSQL
+- **Zod** — request validation
+- **AWS SDK v3** — S3, DynamoDB clients
+
+### Frontend
+- **Vue 3** — UI framework (Composition API)
+- **Vue Router** — client-side routing
+- **Pinia** — state management
+- **Tailwind CSS** — styling
+- **shadcn-vue** — component library
+
+### Cloud (AWS Free Tier)
+- **Amazon RDS** — PostgreSQL core database
+- **Amazon S3** — file storage
+- **Amazon DynamoDB** — audit, access, and transaction logs
 
 ## Prerequisites
 
-- Node.js v18+
+- Node.js LTS
 - Git (optional — you can download the ZIP)
 - An AWS account (Free Tier works)
 
