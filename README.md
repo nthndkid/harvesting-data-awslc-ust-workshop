@@ -1,84 +1,95 @@
-# ResearchHub — Polyglot Persistence
+# ProjectHub — Polyglot Persistence
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Vue 3](https://img.shields.io/badge/Vue.js-3-4FC08D.svg?logo=vuedotjs&logoColor=white)](https://vuejs.org/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v4-06B6D4.svg?logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
+[![Bun](https://img.shields.io/badge/Bun-%23000000.svg?logo=bun&logoColor=white)](https://bun.sh/)
+[![Hono](https://img.shields.io/badge/Hono-v4-E36002.svg)](https://hono.dev/)
+[![AWS](https://img.shields.io/badge/AWS-Cloud-232F3E.svg?logo=amazonaws&logoColor=white)](https://aws.amazon.com/)
 
 A workshop project built for **Harvesting Data: Adventures in Data Systems**
-hosted by AWS Learning Club UST on March 28, 2026.
-
-ResearchHub is a research repository platform where students can post papers,
-reference each other's work, leave comments, and like posts. This codebase
-demonstrates a **polyglot persistence architecture** — using the right database
-for the right data type.
+hosted by AWS Learning Club UST × AWS Cloud Club PUP on March 28, 2026.
+ 
+ProjectHub is a platform where students share their software and hardware
+projects — upload a cover image, a research PDF, link a live demo, and let
+the community comment and like your work. This codebase demonstrates a
+**polyglot persistence architecture** — using the right database for the
+right data type.
 
 ## Architecture
-
+ 
 | Layer | Service | Purpose |
 |---|---|---|
-| Core data | Amazon RDS (PostgreSQL) | Users, posts, comments, likes |
-| File storage | Amazon S3 | Research paper PDFs and images |
+| Core data | Amazon RDS (PostgreSQL) | Users, projects, comments, likes |
+| File storage | Amazon S3 | Cover images (JPEG/PNG) and research PDFs |
 | Logging | Amazon DynamoDB | Audit, access, and transaction logs |
-
+ 
 ## Tech Stack
-
+ 
 ### Backend
+- **Bun** — runtime
 - **Hono.js** — lightweight web framework
-- **Drizzle ORM** — type-safe ORM + migrations for PostgreSQL
+- **Drizzle ORM** — type-safe ORM for PostgreSQL
 - **Zod** — request validation
-- **AWS SDK v3** — S3, DynamoDB clients
-
+- **AWS SDK v3** — S3 and DynamoDB clients
+ 
 ### Frontend
-- **Vue 3** — UI framework (Composition API)
-- **Vue Router** — client-side routing
+- **Vue 3** — client-side framework
+- **Vue Router v4** — client-side routing
 - **Pinia** — state management
-- **Tailwind CSS** — styling
-- **shadcn-vue** — component library
-
+- **Tailwind CSS v4** — styling
+- **lucide-vue-next** — icons
+- **Space Mono** — monospace font (Google Fonts)
+ 
 ### Cloud (AWS Free Tier)
-- **Amazon RDS** — PostgreSQL core database
-- **Amazon S3** — file storage
-- **Amazon DynamoDB** — audit, access, and transaction logs
-
+- **Amazon RDS** — PostgreSQL, db.t3.micro, ap-southeast-1
+- **Amazon S3** — file storage, ap-southeast-1
+- **Amazon DynamoDB** — audit, access, and transaction logs, permanent free tier
+ 
 ## Prerequisites
-
+ 
+- [Bun](https://bun.sh/)
 - Node.js LTS
-- Git (optional — you can download the ZIP)
-- An AWS account (Free Tier works)
+- Git
+- An AWS account (Free Tier)
 
 ## Getting Started
-
-Because this project features both a frontend and a backend, you will need to open two separate terminal windows to run them concurrently.
-
+ 
+Open two terminal windows — one for the backend, one for the frontend.
+ 
 ### 1. Backend
-
-The backend uses [Bun](https://bun.sh/) as its runtime. If you don't have Bun installed globally, install it first:
-
-```bash
-npm install -g bun
-```
-
-Next, navigate into the backend directory, install the dependencies, and start the development server:
-
+ 
 ```bash
 cd backend
 bun install
 bun run dev
 ```
-
+ 
+The backend runs on `http://localhost:3000` by default.
+ 
 ### 2. Frontend
-
-Open a new terminal session, navigate to the frontend directory, install the dependencies, and start the Vite development server:
-
+ 
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
-
-### 3. Configuration & AWS Setup
-
-If an environment example file is provided, copy it and fill in your values:
-
+ 
+The frontend runs on `http://localhost:5173` by default.
+ 
+### 3. Configuration
+ 
+Copy the example environment file and fill in your values as you provision each AWS service:
+ 
 ```bash
+cd backend
 cp .env.example .env
 ```
+ 
+You will fill in each key during the workshop in this order:
+1. `DB_*` keys — after provisioning RDS
+2. `AWS_*` and `S3_*` keys — after creating your S3 bucket and IAM user
+3. `DYNAMODB_*` keys — after creating your DynamoDB tables
 
 Follow the workshop guide to provision your AWS resources and fill in each `.env` key as you go.
 
