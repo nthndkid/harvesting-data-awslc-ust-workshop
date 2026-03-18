@@ -44,24 +44,43 @@ for the right data type.
 
 ## Getting Started
 
-1. Clone or download this repository
-2. Install dependencies
+Because this project features both a frontend and a backend, you will need to open two separate terminal windows to run them concurrently.
+
+### 1. Backend
+
+The backend uses [Bun](https://bun.sh/) as its runtime. If you don't have Bun installed globally, install it first:
+
 ```bash
-   npm install
+npm install -g bun
 ```
 
-3. Copy the environment file and fill in your values
+Next, navigate into the backend directory, install the dependencies, and start the development server:
+
 ```bash
-   cp .env.example .env
+cd backend
+bun install
+bun run dev
 ```
 
-4. Follow the workshop guide to provision your AWS resources
-   and fill in each `.env` key as you go
+### 2. Frontend
 
-5. Start the development server
+Open a new terminal session, navigate to the frontend directory, install the dependencies, and start the Vite development server:
+
 ```bash
-   npm run dev
+cd frontend
+npm install
+npm run dev
 ```
+
+### 3. Configuration & AWS Setup
+
+If an environment example file is provided, copy it and fill in your values:
+
+```bash
+cp .env.example .env
+```
+
+Follow the workshop guide to provision your AWS resources and fill in each `.env` key as you go.
 
 ## Workshop
 
