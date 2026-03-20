@@ -22,7 +22,7 @@ right data type.
 |---|---|---|
 | Core data | Amazon RDS (PostgreSQL) | Users, projects, comments, likes |
 | File storage | Amazon S3 | Cover images (JPEG/PNG) and research PDFs |
-| Logging | Amazon DynamoDB | Audit, access, and transaction logs |
+| Logging | Amazon DynamoDB | Unified Audit Trail (Who + What) |
  
 ## Tech Stack
  
@@ -44,7 +44,7 @@ right data type.
 ### Cloud (AWS Free Tier)
 - **Amazon RDS** — PostgreSQL, db.t3.micro, ap-southeast-1
 - **Amazon S3** — file storage, ap-southeast-1
-- **Amazon DynamoDB** — audit, access, and transaction logs, permanent free tier
+- **Amazon DynamoDB** — Unified Audit Trail, permanent free tier
  
 ## Prerequisites
  
@@ -89,7 +89,7 @@ cp .env.example .env
 You will fill in each key during the workshop in this order:
 1. `DB_*` keys — after provisioning RDS
 2. `AWS_*` and `S3_*` keys — after creating your S3 bucket and IAM user
-3. `DYNAMODB_*` keys — after creating your DynamoDB tables
+3. `DYNAMODB_TABLE` key — after creating your Audit Trail table
 
 Follow the workshop guide to provision your AWS resources and fill in each `.env` key as you go.
 
@@ -101,7 +101,7 @@ each AWS service one by one in this order:
 1. **Amazon RDS** — provision PostgreSQL, import the provided SQL dump,
    connect the app
 2. **Amazon S3** — create a bucket, configure IAM, enable file uploads
-3. **Amazon DynamoDB** — create three log tables, migrate logging off
+3. **Amazon DynamoDB** — create a Unified Audit Trail table, migrate logging off
    PostgreSQL
 
 A full step-by-step workshop guide is provided at the event.
