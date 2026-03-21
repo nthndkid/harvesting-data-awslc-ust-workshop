@@ -8,7 +8,7 @@
 [![AWS](https://img.shields.io/badge/AWS-Cloud-232F3E.svg?logo=amazonaws&logoColor=white)](https://aws.amazon.com/)
 
 A workshop project built for **Harvesting Data: Adventures in Data Systems**
-hosted by AWS Learning Club UST × AWS Cloud Club PUP on March 28, 2026.
+hosted by AWS Learning Club UST.
  
 ProjectHub is a platform where students share their software and hardware
 projects — upload a cover image, a research PDF, link a live demo, and let
