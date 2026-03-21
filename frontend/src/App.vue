@@ -1,85 +1,30 @@
 <script setup lang="ts">
-import { RouterLink, RouterView } from 'vue-router'
-import HelloWorld from './components/HelloWorld.vue'
+// ─── Vue core imports ───────────────────────────────────────────────────────
+import { storeToRefs } from 'pinia'
+// ─── Component imports ──────────────────────────────────────────────────────
+import AppNavbar from '@/components/AppNavbar.vue'
+import NameModal from '@/components/NameModal.vue'
+// ─── Store imports ──────────────────────────────────────────────────────────
+import { useAuthStore } from '@/stores/auth'
+
+// ─── Store access ───────────────────────────────────────────────────────────
+// isAuthenticated drives the app gate — NameModal shows until name is entered
+const { isAuthenticated } = storeToRefs(useAuthStore())
 </script>
 
 <template>
-  <header>
-    <img alt="Vue logo" class="logo" src="@/assets/logo.svg" width="125" height="125" />
+  <!-- NameModal: shown on first visit until builder enters their name -->
+  <!-- Rendered regardless of auth state — it handles its own visibility -->
+  <NameModal />
 
-    <div class="wrapper">
-      <HelloWorld msg="You did it!" />
+  <!-- Main app shell: only renders after name is set -->
+  <template v-if="isAuthenticated">
+    <!-- Fixed top navigation bar -->
+    <AppNavbar />
 
-      <nav>
-        <RouterLink to="/">Home</RouterLink>
-        <RouterLink to="/about">About</RouterLink>
-      </nav>
-    </div>
-  </header>
-
-  <RouterView />
+    <!-- Page content — offset by navbar height (pt-16) -->
+    <main class="pt-16 min-h-screen bg-background">
+      <RouterView />
+    </main>
+  </template>
 </template>
-
-<style scoped>
-header {
-  line-height: 1.5;
-  max-height: 100vh;
-}
-
-.logo {
-  display: block;
-  margin: 0 auto 2rem;
-}
-
-nav {
-  width: 100%;
-  font-size: 12px;
-  text-align: center;
-  margin-top: 2rem;
-}
-
-nav a.router-link-exact-active {
-  color: var(--color-text);
-}
-
-nav a.router-link-exact-active:hover {
-  background-color: transparent;
-}
-
-nav a {
-  display: inline-block;
-  padding: 0 1rem;
-  border-left: 1px solid var(--color-border);
-}
-
-nav a:first-of-type {
-  border: 0;
-}
-
-@media (min-width: 1024px) {
-  header {
-    display: flex;
-    place-items: center;
-    padding-right: calc(var(--section-gap) / 2);
-  }
-
-  .logo {
-    margin: 0 2rem 0 0;
-  }
-
-  header .wrapper {
-    display: flex;
-    place-items: flex-start;
-    flex-wrap: wrap;
-  }
-
-  nav {
-    text-align: left;
-    margin-left: -1rem;
-    font-size: 1rem;
-
-    padding: 1rem 0;
-    margin-top: 1rem;
-  }
-}
-</style>
