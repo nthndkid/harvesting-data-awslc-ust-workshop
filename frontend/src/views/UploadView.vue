@@ -6,10 +6,10 @@ import { RouterLink } from 'vue-router'
 // ─── Component imports ──────────────────────────────────────────────────────
 import FileDropzone from '@/components/FileDropzone.vue'
 import { Image as ImageIcon, FileText } from 'lucide-vue-next'
-import { useMissionStore } from '@/stores/mission'
+import { useUploadStore } from '@/stores/upload'
 
 // ─── Local state ────────────────────────────────────────────────────────────
-const missionStore = useMissionStore()
+const uploadStore = useUploadStore()
 const title = ref('')
 const description = ref('')
 const demoUrl = ref('')
@@ -18,6 +18,7 @@ const coverFile = ref<File | null>(null)
 const pdfFile = ref<File | null>(null)
 const isSubmitting = ref(false)
 const isSuccess = ref(false)
+const submitError = ref<string | null>(null)
 
 // ─── Methods ────────────────────────────────────────────────────────────────
 // Handle file selection emits from FileDropzone components
@@ -29,7 +30,6 @@ function onPdfSelected(file: File) {
 }
 
 // Parse comma-separated tags string into uppercase string array
-// e.g. "aws, bun, postgresql" → ['AWS', 'BUN', 'POSTGRESQL']
 function parseTags(raw: string): string[] {
   return raw
     .split(',')
@@ -37,26 +37,41 @@ function parseTags(raw: string): string[] {
     .filter(t => t.length > 0)
 }
 
-// Submit handler — validates, simulates API delay, shows success state
+// Submit handler
 async function handleSubmit() {
-  // Basic validation — title, description, and PDF are required
-  // Cover image and demo URL are optional
-  if (!title.value.trim() || !description.value.trim() || !pdfFile.value) return
+  if (!title.value.trim() || !description.value.trim() || !pdfFile.value) {
+    submitError.value = 'PLEASE PROVIDE TITLE, DESCRIPTION, AND RESEARCH PDF'
+    return
+  }
 
   isSubmitting.value = true
+  submitError.value = null
 
-  // 🌐 API: POST /uploads/cover → S3 PutObject → returns cover_image_key
-  // 🌐 API: POST /uploads/pdf → S3 PutObject → returns pdf_key
-  // 🌐 API: POST /projects → inserts into RDS projects table
-  //         → project includes: title, description, tags, demoUrl, cover_image_key, pdf_key
-  //         → writes transaction log to DynamoDB (PROJECT CREATE)
-  // Currently: simulating with an 800ms delay
-  const _tags = parseTags(tagsInput.value)  // Tags ready for API payload
-  await new Promise(resolve => setTimeout(resolve, 800))
+  try {
+    // 1. Upload files to S3 first, get back the keys
+    let coverKey: string | null = null
+    if (coverFile.value) {
+      coverKey = await uploadStore.uploadCover(coverFile.value)
+    }
+    const pdfKey = await uploadStore.uploadPdf(pdfFile.value)
 
-  missionStore.completeMission('UPLOAD')
-  isSubmitting.value = false
-  isSuccess.value = true
+    // 2. Create project in RDS — send keys, never full URLs
+    await uploadStore.submitProject({
+      title: title.value,
+      description: description.value,
+      demoUrl: demoUrl.value || null,
+      tags: parseTags(tagsInput.value),
+      coverImageKey: coverKey,
+      pdfKey,
+    })
+    
+    isSuccess.value = true
+  } catch (err: any) {
+    submitError.value = err.message || 'Failed to submit project. Please try again.'
+    console.error('Submission error:', err)
+  } finally {
+    isSubmitting.value = false
+  }
 }
 </script>
 
@@ -77,7 +92,6 @@ async function handleSubmit() {
         v-if="isSuccess"
         class="flex flex-col items-center justify-center py-10 text-center gap-4"
       >
-        <!-- Large checkmark in gold -->
         <span class="text-primary text-6xl">✓</span>
         <h2 class="text-2xl font-bold uppercase text-foreground mt-2">PROJECT SUBMITTED!</h2>
         <p class="text-muted text-sm">Your build is now live on the feed.</p>
@@ -95,6 +109,11 @@ async function handleSubmit() {
         @submit.prevent="handleSubmit"
         class="space-y-6"
       >
+        <!-- Error Banner -->
+        <div v-if="submitError" class="bg-red-500/10 border-2 border-red-500/50 p-4 text-red-500 font-bold uppercase text-xs">
+          ❌ {{ submitError }}
+        </div>
+
         <!-- PROJECT TITLE * (required) -->
         <div>
           <label for="project-title" class="block text-primary font-bold uppercase text-xs mb-1">
@@ -104,8 +123,10 @@ async function handleSubmit() {
             id="project-title"
             v-model="title"
             type="text"
+            required
+            :disabled="isSubmitting"
             placeholder="What did you build?"
-            class="bg-card text-card-foreground border-2 border-border rounded-none focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background px-4 py-2 w-full font-mono"
+            class="bg-card text-card-foreground border-2 border-border rounded-none focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background px-4 py-2 w-full font-mono disabled:opacity-50"
           />
         </div>
 
@@ -118,8 +139,10 @@ async function handleSubmit() {
             id="project-desc"
             v-model="description"
             rows="4"
+            required
+            :disabled="isSubmitting"
             placeholder="Tell the community about your project..."
-            class="bg-card text-card-foreground border-2 border-border rounded-none focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background px-4 py-2 w-full font-mono resize-none"
+            class="bg-card text-card-foreground border-2 border-border rounded-none focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background px-4 py-2 w-full font-mono resize-none disabled:opacity-50"
           ></textarea>
         </div>
 
@@ -134,12 +157,13 @@ async function handleSubmit() {
               id="project-tags"
               v-model="tagsInput"
               type="text"
+              :disabled="isSubmitting"
               placeholder="AWS, BUN, POSTGRESQL"
-              class="bg-card text-card-foreground border-2 border-border rounded-none focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background px-4 py-2 w-full font-mono"
+              class="bg-card text-card-foreground border-2 border-border rounded-none focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background px-4 py-2 w-full font-mono disabled:opacity-50"
             />
             <p class="text-muted text-xs mt-1 font-mono">Comma-separated, e.g. "AWS, PYTHON, IOT"</p>
 
-            <!-- Live tag preview — renders badges as the user types -->
+            <!-- Live tag preview -->
             <div v-if="tagsInput.trim()" class="flex flex-wrap gap-2 mt-3">
               <span
                 v-for="tag in parseTags(tagsInput)"
@@ -160,8 +184,9 @@ async function handleSubmit() {
               id="demo-url"
               v-model="demoUrl"
               type="url"
+              :disabled="isSubmitting"
               placeholder="https://your-demo.vercel.app"
-              class="bg-card text-card-foreground border-2 border-border rounded-none focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background px-4 py-2 w-full font-mono"
+              class="bg-card text-card-foreground border-2 border-border rounded-none focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background px-4 py-2 w-full font-mono disabled:opacity-50"
             />
           </div>
         </div>
@@ -176,6 +201,7 @@ async function handleSubmit() {
             <FileDropzone
               label="COVER IMAGE"
               accept=".jpg,.jpeg,.png"
+              :disabled="isSubmitting"
               :icon="ImageIcon"
               @file-selected="onCoverSelected"
             />
@@ -189,19 +215,23 @@ async function handleSubmit() {
             <FileDropzone
               label="RESEARCH PDF"
               accept=".pdf"
+              :disabled="isSubmitting"
               :icon="FileText"
               @file-selected="onPdfSelected"
             />
           </div>
         </div>
 
-        <!-- SUBMIT button — full width, shows "SUBMITTING..." during delay -->
+        <!-- SUBMIT button -->
         <button
           type="submit"
           :disabled="isSubmitting"
           class="w-full bg-primary text-primary-foreground border-2 border-border rounded-none shadow-[4px_4px_0px_var(--shadow)] hover:-translate-x-[2px] hover:-translate-y-[2px] hover:shadow-[6px_6px_0px_var(--shadow)] active:translate-x-0 active:translate-y-0 active:shadow-none transition-all duration-200 font-bold uppercase py-4 disabled:opacity-60 disabled:cursor-not-allowed disabled:translate-x-0 disabled:translate-y-0 disabled:shadow-[4px_4px_0px_var(--shadow)]"
         >
-          {{ isSubmitting ? 'SUBMITTING...' : 'SUBMIT PROJECT →' }}
+          <span v-if="isSubmitting" class="flex items-center justify-center gap-2">
+            <span class="animate-spin text-xl">⏳</span> UPLOADING...
+          </span>
+          <span v-else>SUBMIT PROJECT →</span>
         </button>
       </form>
     </div>

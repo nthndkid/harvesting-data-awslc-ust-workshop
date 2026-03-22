@@ -11,7 +11,7 @@ const missionsData = {
   S3: { title: 'S3 STORAGE SECURED', desc: 'Successfully wire up S3 for immutable object storage' },
   DYNAMO: { title: 'DYNAMODB CONNECTED', desc: 'Initialize your NoSQL event log table' },
   UPLOAD: { title: 'FIRST DEPLOYMENT', desc: 'Successfully upload a Project with Image & PDF' },
-  ENGAGEMENT: { title: 'COMMUNITY ARCHITECT', desc: 'Like any project on the feed' },
+  LIKE: { title: 'COMMUNITY ARCHITECT', desc: 'Like any project on the feed' },
   ADMIN: { title: 'DATA ADMIN', desc: 'Load the Admin Dashboard stats' }
 }
 

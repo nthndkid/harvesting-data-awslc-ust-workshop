@@ -7,14 +7,14 @@ import { storeToRefs } from 'pinia'
 // ─── Store imports ──────────────────────────────────────────────────────────
 import { useAuthStore } from '@/stores/auth'
 import { useMissionStore } from '@/stores/mission'
-import { User, Trophy } from 'lucide-vue-next'
+import { User, Trophy, LogOut } from 'lucide-vue-next'
 // ─── Component imports ──────────────────────────────────────────────────────
 import MissionModal from '@/components/MissionModal.vue'
 import CongratsModal from '@/components/CongratsModal.vue'
 
-// ─── Store access ───────────────────────────────────────────────────────────
 // Read username from auth store to display in the top-right badge
-const { username } = storeToRefs(useAuthStore())
+const authStore = useAuthStore()
+const { username } = storeToRefs(authStore)
 
 const missionStore = useMissionStore()
 const showMissionLog = ref(false)
@@ -73,6 +73,15 @@ onMounted(() => {
       <span class="flex items-center gap-1 bg-primary text-primary-foreground border-2 border-border text-xs font-bold uppercase px-3 py-1 rounded-none shadow-[2px_2px_0px_var(--shadow)]">
         <User :size="14" /> {{ username }}
       </span>
+
+      <!-- Logout button -->
+      <button
+        @click="authStore.logout()"
+        title="Logout"
+        class="bg-card text-card-foreground border-2 border-border p-1.5 hover:bg-red-500 hover:text-white transition-colors duration-200 shadow-[2px_2px_0px_var(--shadow)] active:translate-x-0 active:translate-y-0 active:shadow-none"
+      >
+        <LogOut :size="14" />
+      </button>
     </div>
   </nav>
 

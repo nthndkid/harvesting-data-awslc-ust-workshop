@@ -7,10 +7,9 @@ import { useRoute, RouterLink } from 'vue-router'
 import { storeToRefs } from 'pinia'
 // ─── Component imports ──────────────────────────────────────────────────────
 import CommentItem from '@/components/CommentItem.vue'
-import ErrorState from '@/components/ErrorState.vue'
 // ─── Store imports ──────────────────────────────────────────────────────────
 import { useAuthStore } from '@/stores/auth'
-import { useMissionStore } from '@/stores/mission'
+import { useProjectsStore } from '@/stores/projects'
 import {
   User,
   Image as ImageIcon,
@@ -19,9 +18,7 @@ import {
   ThumbsUp,
 } from 'lucide-vue-next'
 // ─── Type imports ───────────────────────────────────────────────────────────
-import type { Comment } from '@/types/projecthub.types'
-// ─── Data imports ───────────────────────────────────────────────────────────
-import { mockProjects, mockComments } from '@/data/mockData'
+import type { Project, Comment } from '@/types/projecthub.types'
 
 // ─── Route ──────────────────────────────────────────────────────────────────
 const route = useRoute()
@@ -29,32 +26,44 @@ const id = route.params.id as string
 
 // ─── Store access ───────────────────────────────────────────────────────────
 const { username } = storeToRefs(useAuthStore())
-const missionStore = useMissionStore()
+const projectsStore = useProjectsStore()
 
 // ─── Data source ────────────────────────────────────────────────────────────
-const project = ref<typeof mockProjects[0] | null>(null)
+const project = ref<Project | null>(null)
 const comments = ref<Comment[]>([])
 const isLoading = ref(true)
-const apiError = ref<string | null>(null)
+const error = ref<string | null>(null)
+const coverUrl = ref<string | null>(null)
 
 // ─── Local state ────────────────────────────────────────────────────────────
 const isLiked = ref(false)
 const likeCount = ref(0)
+const isSubmittingComment = ref(false)
 
 onMounted(async () => {
+  isLoading.value = true
+  error.value = null
   try {
-    const url = import.meta.env.VITE_API_URL || 'http://localhost:3000'
-    await fetch(url)
-    
-    // Load mock data on success
-    const found = mockProjects.find(p => p.id === id)
-    if (found) {
-      project.value = found
-      likeCount.value = found.likes ?? 0
+    // 1. Fetch project details
+    project.value = await projectsStore.fetchProject(id)
+    if (project.value) {
+      likeCount.value = project.value.likes || 0
+      
+      // 2. Fetch cover image URL if it exists
+      if (project.value.coverImageKey) {
+        try {
+          coverUrl.value = await projectsStore.getCoverUrl(id)
+        } catch (e) {
+          console.error('Failed to fetch cover URL', e)
+        }
+      }
     }
-    comments.value = mockComments.filter(c => c.projectId === id)
+
+    // 3. Fetch comments
+    comments.value = await projectsStore.fetchComments(id)
   } catch (err) {
-    apiError.value = `Unable to reach API at ${import.meta.env.VITE_API_URL || 'http://localhost:3000'}`
+    error.value = 'Failed to load project details'
+    console.error(err)
   } finally {
     isLoading.value = false
   }
@@ -69,64 +78,69 @@ const commentCount = computed(() => comments.value.length)
 
 // ─── Methods ────────────────────────────────────────────────────────────────
 // Toggle like — flips state and updates count
-// 🌐 API: POST /projects/:id/like
-// → Hono toggles like in RDS likes table
-// → Writes transaction log to DynamoDB (LIKE or UNLIKE)
-function toggleLike() {
-  if (isLiked.value) {
-    likeCount.value--
-  } else {
-    likeCount.value++
-    missionStore.completeMission('ENGAGEMENT')
+async function toggleLike() {
+  try {
+    const data = await projectsStore.toggleLike(id)
+    isLiked.value = data.liked
+    likeCount.value = data.count
+  } catch (e) {
+    console.error('Failed to toggle like', e)
   }
-  isLiked.value = !isLiked.value
 }
 
-// Handle PDF download — shows alert in mock build (S3 not connected)
-// 🌐 API: GET /projects/:id/download-pdf
-// → Hono calls S3 GetObject presigned URL (15min expiry)
-// → Open the returned URL in a new tab
-function handlePdfDownload() {
-  window.alert('PDF download coming soon — S3 not connected yet')
+// Handle PDF download — fetches presigned URL from API
+async function handlePdfDownload() {
+  try {
+    const url = await projectsStore.getPdfUrl(id)
+    window.open(url, '_blank')
+  } catch (e) {
+    alert('Failed to get download link')
+    console.error(e)
+  }
 }
 
-// Submit a new comment — prepends to list
-// 🌐 API: POST /projects/:id/comments
-// → Inserts into RDS comments table
-// → Writes transaction log to DynamoDB (COMMENT CREATE)
-function handleCommentSubmit() {
-  // Validate — must not be empty
-  if (!newCommentBody.value.trim()) return
-
-  const newComment: Comment = {
-    id: Date.now().toString(),
-    projectId: id,
-    author: username.value ?? 'Anonymous',
-    body: newCommentBody.value.trim(),
-    createdAt: new Date().toISOString().split('T')[0]!, // YYYY-MM-DD format
+// Submit a new comment
+async function handleCommentSubmit() {
+  if (!newCommentBody.value.trim() || isSubmittingComment.value) return
+  
+  isSubmittingComment.value = true
+  try {
+    const newComment = await projectsStore.postComment(id, newCommentBody.value.trim())
+    // Prepend so the new comment appears at the top
+    comments.value.unshift(newComment)
+    // Clear the textarea
+    newCommentBody.value = ''
+  } catch (e) {
+    alert('Failed to post comment')
+    console.error(e)
+  } finally {
+    isSubmittingComment.value = false
   }
-
-  // Prepend so the new comment appears at the top
-  comments.value.unshift(newComment)
-
-  // Clear the textarea
-  newCommentBody.value = ''
 }
 </script>
 
 <template>
   <div class="max-w-3xl mx-auto px-6 py-10">
 
-    <!-- ── API Error State ────────────────────────────────────────────────── -->
-    <ErrorState v-if="apiError" :error="apiError" />
-
     <!-- ── Loading State ──────────────────────────────────────────────────── -->
-    <div v-else-if="isLoading" class="flex flex-col items-center justify-center py-24 gap-6">
-      <p class="text-muted font-bold uppercase text-sm font-mono animate-pulse">CONNECTING TO BACKEND...</p>
+    <div v-if="isLoading" class="flex flex-col items-center justify-center py-24 gap-6">
+      <p class="text-muted font-bold uppercase text-sm font-mono animate-pulse">LOADING PROJECT...</p>
+    </div>
+
+    <!-- ── API Error State ────────────────────────────────────────────────── -->
+    <div v-else-if="error" class="text-center py-12">
+      <div class="bg-card border-2 border-border rounded-none shadow-[5px_5px_0px_var(--shadow)] p-10">
+        <p class="font-bold uppercase text-2xl text-foreground mb-4">{{ error }}</p>
+        <RouterLink
+          :to="{ name: 'feed' }"
+          class="bg-card text-card-foreground border-2 border-border rounded-none shadow-[4px_4px_0px_var(--shadow)] hover:-translate-x-[2px] hover:-translate-y-[2px] hover:shadow-[6px_6px_0px_var(--shadow)] active:translate-x-0 active:translate-y-0 active:shadow-none transition-all duration-200 font-bold uppercase px-6 py-3 inline-block"
+        >
+          ← BACK TO FEED
+        </RouterLink>
+      </div>
     </div>
 
     <!-- ── Not Found State ────────────────────────────────────────────────── -->
-    <!-- Shown when the project id doesn't match any mock project -->
     <div
       v-else-if="!project"
       class="flex flex-col items-center justify-center py-24 gap-6"
@@ -143,7 +157,7 @@ function handleCommentSubmit() {
     </div>
 
     <!-- ── Project Detail ─────────────────────────────────────────────────── -->
-    <template v-if="project">
+    <template v-else>
 
       <!-- Back link -->
       <RouterLink
@@ -166,15 +180,15 @@ function handleCommentSubmit() {
       <!-- Gold divider -->
       <hr class="border-t-2 border-primary my-6" />
 
-      <!-- Cover image placeholder -->
-      <!-- 🌐 API: GET /projects/:id/cover -->
-      <!-- → Hono calls S3 GetObject → returns presigned URL (15min) -->
-      <!-- → Replace placeholder with: <img :src="coverUrl" class="w-full h-48 object-cover" /> -->
-      <div class="bg-card border-2 border-border rounded-none h-48 flex items-center justify-center mb-6">
+      <!-- Cover image -->
+      <div v-if="!coverUrl"
+        class="bg-card border-2 border-border rounded-none h-48 flex items-center justify-center mb-6">
         <span class="flex items-center gap-2 text-muted font-mono text-sm">
-          <ImageIcon :size="18" /> COVER IMAGE
+          <ImageIcon :size="18" /> NO COVER IMAGE
         </span>
       </div>
+      <img v-else :src="coverUrl" alt="Cover"
+        class="w-full h-48 object-cover border-2 border-border mb-6 shadow-[4px_4px_0px_var(--shadow)]" />
 
       <!-- About this project (accent card with gold left border) -->
       <div class="bg-card text-card-foreground border-2 border-border border-l-[6px] border-l-primary rounded-none shadow-[5px_5px_0px_var(--shadow)] p-6 mb-6">
@@ -195,7 +209,7 @@ function handleCommentSubmit() {
         </div>
       </a>
 
-      <!-- PDF download button (always rendered — every project has a PDF) -->
+      <!-- PDF download button -->
       <button
         @click="handlePdfDownload"
         class="block w-full bg-primary text-primary-foreground border-2 border-border rounded-none shadow-[4px_4px_0px_var(--shadow)] hover:-translate-x-[2px] hover:-translate-y-[2px] hover:shadow-[6px_6px_0px_var(--shadow)] active:translate-x-0 active:translate-y-0 active:shadow-none transition-all duration-200 font-bold uppercase py-3 mb-6"
@@ -217,7 +231,6 @@ function handleCommentSubmit() {
       </div>
 
       <!-- Like toggle button -->
-      <!-- Unliked: ghost button | Liked: primary gold button -->
       <button
         @click="toggleLike"
         :class="[
@@ -258,7 +271,7 @@ function handleCommentSubmit() {
         <label for="comment-textarea" class="text-primary font-bold uppercase text-xs block mb-1">
           YOUR COMMENT
         </label>
-        <p class="text-muted text-xs mb-3">Posting as: {{ username }}</p>
+        <p class="text-muted text-xs mb-3">Posting as: {{ username || 'Anonymous' }}</p>
 
         <!-- Textarea -->
         <textarea
@@ -266,6 +279,7 @@ function handleCommentSubmit() {
           v-model="newCommentBody"
           rows="4"
           placeholder="Write something thoughtful..."
+          :disabled="isSubmittingComment"
           class="bg-card text-card-foreground border-2 border-border rounded-none focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background px-4 py-2 w-full font-mono text-sm resize-none mb-4"
         ></textarea>
 
@@ -273,9 +287,10 @@ function handleCommentSubmit() {
         <div class="flex justify-end">
           <button
             @click="handleCommentSubmit"
-            class="bg-primary text-primary-foreground border-2 border-border rounded-none shadow-[4px_4px_0px_var(--shadow)] hover:-translate-x-[2px] hover:-translate-y-[2px] hover:shadow-[6px_6px_0px_var(--shadow)] active:translate-x-0 active:translate-y-0 active:shadow-none transition-all duration-200 font-bold uppercase px-6 py-2"
+            :disabled="isSubmittingComment || !newCommentBody.trim()"
+            class="bg-primary text-primary-foreground border-2 border-border rounded-none shadow-[4px_4px_0px_var(--shadow)] hover:-translate-x-[2px] hover:-translate-y-[2px] hover:shadow-[6px_6px_0px_var(--shadow)] active:translate-x-0 active:translate-y-0 active:shadow-none transition-all duration-200 font-bold uppercase px-6 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            POST COMMENT →
+            {{ isSubmittingComment ? 'POSTING...' : 'POST COMMENT →' }}
           </button>
         </div>
       </div>

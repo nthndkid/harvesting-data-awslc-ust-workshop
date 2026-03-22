@@ -44,10 +44,10 @@ const missions = [
     status: () => missionStore.missions.UPLOAD
   },
   {
-    id: 'ENGAGEMENT',
+    id: 'LIKE',
     title: 'COMMUNITY ARCHITECT',
     desc: 'Like any project on the feed',
-    status: () => missionStore.missions.ENGAGEMENT
+    status: () => missionStore.missions.LIKE
   },
   {
     id: 'ADMIN',
