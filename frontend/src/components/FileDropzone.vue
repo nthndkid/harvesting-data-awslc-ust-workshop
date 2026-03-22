@@ -7,6 +7,7 @@ const props = defineProps<{
   label: string   // "COVER IMAGE" or "RESEARCH PDF"
   accept: string  // ".jpg,.jpeg,.png" or ".pdf"
   icon: any       // Lucide component
+  disabled?: boolean
 }>()
 
 // ─── Emits ──────────────────────────────────────────────────────────────────
@@ -21,6 +22,7 @@ const inputRef = ref<HTMLInputElement | null>(null)
 // ─── Methods ────────────────────────────────────────────────────────────────
 // Trigger the hidden file input on div click
 function openFilePicker() {
+  if (props.disabled) return
   inputRef.value?.click()
 }
 
@@ -31,6 +33,14 @@ function handleFileChange(event: Event) {
   if (!file) return
   selectedFile.value = file
   emit('fileSelected', file)
+}
+
+// ─── Computed ───────────────────────────────────────────────────────────────
+function truncateName(name: string, maxLen = 20) {
+  if (name.length <= maxLen) return name
+  const ext = name.split('.').pop()
+  const base = name.split('.').slice(0, -1).join('.')
+  return base.substring(0, maxLen - 5) + '...' + ext
 }
 </script>
 
@@ -46,7 +56,10 @@ function handleFileChange(event: Event) {
   <!-- → Returns S3 key → stored in projects.pdf_key in RDS -->
   <div
     @click="openFilePicker"
-    class="border-2 border-dashed border-border bg-card min-h-[120px] flex flex-col items-center justify-center cursor-pointer rounded-none hover:bg-primary/5 transition-colors duration-200 px-4 py-6"
+    :class="[
+      'border-2 border-dashed border-border bg-card min-h-[120px] flex flex-col items-center justify-center rounded-none transition-colors duration-200 px-4 py-6',
+      disabled ? 'opacity-50 cursor-not-allowed bg-muted' : 'cursor-pointer hover:bg-primary/5'
+    ]"
   >
     <!-- Default state: instructions text -->
     <template v-if="!selectedFile">
@@ -61,7 +74,7 @@ function handleFileChange(event: Event) {
     <!-- Selected state: show icon + filename in gold -->
     <template v-else>
       <p class="flex items-center justify-center gap-2 text-primary font-bold text-sm font-mono text-center">
-        <component :is="icon" :size="20" /> {{ selectedFile.name }}
+        <component :is="icon" :size="20" /> {{ truncateName(selectedFile.name) }}
       </p>
     </template>
   </div>

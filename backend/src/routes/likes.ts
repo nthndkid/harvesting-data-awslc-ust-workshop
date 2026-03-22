@@ -6,9 +6,9 @@ import { OpenAPIHono, createRoute } from '@hono/zod-openapi'
 import { z } from '@hono/zod-openapi'
 import { db } from '../db'
 import { likes } from '../db/schema'
-import { eq, and } from 'drizzle-orm'
+import { eq, and, sql } from 'drizzle-orm'
 import { logData } from '../lib/dynamo'
-import { ErrorSchema, ProjectIdParamsSchema, SuccessMessageSchema } from '../lib/validators'
+import { ErrorSchema, ProjectIdParamsSchema } from '../lib/validators'
 
 const router = new OpenAPIHono()
 
@@ -30,7 +30,14 @@ const toggleLikeRoute = createRoute({
   responses: {
     200: {
       description: 'Like toggled',
-      content: { 'application/json': { schema: SuccessMessageSchema } }
+      content: { 
+        'application/json': { 
+          schema: z.object({ 
+            liked: z.boolean(), 
+            count: z.number() 
+          }) 
+        } 
+      }
     },
     500: {
       description: 'Server error',
@@ -49,32 +56,40 @@ router.openapi(toggleLikeRoute, async (c) => {
       .where(and(eq(likes.projectId, id), eq(likes.userId, userId)))
 
     if (existing) {
-      // Unlike
+      // 1. Unlike in RDS
       await db.delete(likes).where(eq(likes.likeId, existing.likeId))
       
-      // DynamoDB: database event log
+      // 2. DynamoDB: UNLIKE event log
       await logData({
         userId,
         action: 'UNLIKE',
         resourceId: id,
         entityType: 'LIKE'
       })
-      
-      return c.json({ message: 'Unliked' }, 200)
     } else {
-      // Like
+      // 1. Like in RDS
       await db.insert(likes).values({ projectId: id, userId })
       
-      // DynamoDB: database event log
+      // 2. DynamoDB: LIKE event log
       await logData({
         userId,
         action: 'LIKE',
         resourceId: id,
         entityType: 'LIKE'
       })
-      
-      return c.json({ message: 'Liked' }, 200)
     }
+
+    // 3. Get updated total count for this project
+    const [countResult] = await db.select({ 
+      count: sql<number>`count(*)`.mapWith(Number) 
+    })
+    .from(likes)
+    .where(eq(likes.projectId, id))
+
+    return c.json({ 
+      liked: !existing, 
+      count: countResult?.count ?? 0 
+    }, 200)
   } catch (error) {
     console.error('POST /projects/:id/like failed:', error)
     return c.json({ error: 'Failed to toggle like' }, 500)

@@ -5,10 +5,10 @@
 import { OpenAPIHono, createRoute } from '@hono/zod-openapi'
 import { z } from '@hono/zod-openapi'
 import { db } from '../db'
-import { comments } from '../db/schema'
+import { comments, users } from '../db/schema'
 import { eq, desc } from 'drizzle-orm'
 import { logData } from '../lib/dynamo'
-import { createCommentSchema, ErrorSchema, ProjectIdParamsSchema, SuccessMessageSchema } from '../lib/validators'
+import { createCommentSchema, ErrorSchema, ProjectIdParamsSchema } from '../lib/validators'
 
 const router = new OpenAPIHono()
 
@@ -33,10 +33,19 @@ const getCommentsRoute = createRoute({
 router.openapi(getCommentsRoute, async (c) => {
   const { id } = c.req.valid('param')
   try {
-    // RDS: query comments for a project
-    const projectComments = await db.select().from(comments)
-      .where(eq(comments.projectId, id))
-      .orderBy(desc(comments.createdAt))
+    // RDS: query comments for a project with userName join
+    const projectComments = await db.select({
+      commentId: comments.commentId,
+      projectId: comments.projectId,
+      userId: comments.userId,
+      body: comments.body,
+      createdAt: comments.createdAt,
+      userName: users.userName
+    })
+    .from(comments)
+    .where(eq(comments.projectId, id))
+    .leftJoin(users, eq(comments.userId, users.userId))
+    .orderBy(desc(comments.createdAt))
 
     return c.json(projectComments, 200)
   } catch (error) {
@@ -58,7 +67,7 @@ const createCommentRoute = createRoute({
   responses: {
     201: {
       description: 'Comment created',
-      content: { 'application/json': { schema: SuccessMessageSchema } }
+      content: { 'application/json': { schema: z.any() } }
     },
     500: {
       description: 'Server error',
@@ -72,14 +81,14 @@ router.openapi(createCommentRoute, async (c) => {
   const { body, userId } = c.req.valid('json')
   
   try {
-    // RDS: Insert comment
-    await db.insert(comments).values({
+    // 1. RDS: Insert comment
+    const [newCommentData] = await db.insert(comments).values({
       projectId: id,
       userId,
       body
-    })
+    }).returning()
 
-    // DynamoDB: log COMMENT CREATE
+    // 2. DynamoDB: log COMMENT CREATE
     await logData({
       userId,
       action: 'CREATE',
@@ -87,7 +96,20 @@ router.openapi(createCommentRoute, async (c) => {
       entityType: 'COMMENT'
     })
 
-    return c.json({ message: 'Comment created' }, 201)
+    // 3. Fetch full comment with userName to return to frontend
+    const [fullComment] = await db.select({
+      commentId: comments.commentId,
+      projectId: comments.projectId,
+      userId: comments.userId,
+      body: comments.body,
+      createdAt: comments.createdAt,
+      userName: users.userName
+    })
+    .from(comments)
+    .where(eq(comments.commentId, newCommentData.commentId))
+    .leftJoin(users, eq(comments.userId, users.userId))
+
+    return c.json(fullComment, 201)
   } catch (error) {
     console.error('POST /projects/:id/comments failed:', error)
     return c.json({ error: 'Failed to create comment' }, 500)

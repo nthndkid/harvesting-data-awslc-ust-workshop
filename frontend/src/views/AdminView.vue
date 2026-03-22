@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // ─── Vue core imports ───────────────────────────────────────────────────────
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 // ─── Charts (vue-chartjs + Chart.js) ────────────────────────────────────────
 import { Line, Bar } from 'vue-chartjs'
 import {
@@ -15,6 +15,7 @@ import AdminStatCard from '@/components/AdminStatCard.vue'
 import AdminTable from '@/components/AdminTable.vue'
 import LogTabs from '@/components/LogTabs.vue'
 import ErrorState from '@/components/ErrorState.vue'
+import { useAdminStore } from '@/stores/admin'
 import { useMissionStore } from '@/stores/mission'
 import {
   LayoutDashboard,
@@ -22,11 +23,7 @@ import {
   Database,
   Zap,
 } from 'lucide-vue-next'
-// ─── Data imports ───────────────────────────────────────────────────────────
-import {
-  mockProjects, mockComments, mockLikes,
-  mockS3Stats, mockS3Objects,
-} from '@/data/mockData'
+import { storeToRefs } from 'pinia'
 
 // ─── Register Chart.js (tree-shakeable — must be explicit) ──────────────────
 ChartJS.register(
@@ -53,12 +50,17 @@ const tooltip = {
 const grid = { color: `${C_FG}18`, lineWidth: 1 }
 const axisBorder = { color: C_BORDER, width: 2 }
 
-// ─── Chart 1: Daily Uploads (Line) ──────────────────────────────────────────
-const uploadsData = {
+// ─── Store access ───────────────────────────────────────────────────────────
+const adminStore = useAdminStore()
+const { projects, comments, likes, s3Stats, s3Objects, loading } = storeToRefs(adminStore)
+const missionStore = useMissionStore()
+
+// ─── Chart Data (Computed) ──────────────────────────────────────────────────
+const uploadsData = computed(() => ({
   labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
   datasets: [{
     label: 'Uploads',
-    data: [2, 4, 1, 5, 3, 6, 3],
+    data: [2, 4, 1, 5, 3, 6, 3], // Mocked as timeline data requires processing
     borderColor: C_PRIMARY,
     backgroundColor: `${C_PRIMARY}22`,
     borderWidth: 3,
@@ -70,7 +72,30 @@ const uploadsData = {
     tension: 0,
     fill: true,
   }],
-}
+}))
+
+const likesData = computed(() => ({
+  labels: projects.value.map(p => p.title.slice(0, 10)),
+  datasets: [{
+    label: 'Likes',
+    data: projects.value.map(p => p.likes),
+    backgroundColor: C_PRIMARY,
+    borderColor: C_BORDER,
+    borderWidth: 2,
+  }],
+}))
+
+const commentsData = computed(() => ({
+  labels: projects.value.map(p => p.title.slice(0, 10)),
+  datasets: [{
+    label: 'Comments',
+    data: projects.value.map(p => p.comments),
+    backgroundColor: C_FG,
+    borderColor: C_PRIMARY,
+    borderWidth: 2,
+  }],
+}))
+
 const uploadsOptions: ChartOptions<'line'> = {
   responsive: true,
   maintainAspectRatio: false,
@@ -81,39 +106,16 @@ const uploadsOptions: ChartOptions<'line'> = {
   },
 }
 
-// ─── Chart 2: Likes per Project (Bar) ────────────────────────────────────────
-const shortTitles = ['Polyglot', 'Irrigation', 'Lost & Found', 'Jeepney', 'PH Risk', 'FSL']
-const likesData = {
-  labels: shortTitles,
-  datasets: [{
-    label: 'Likes',
-    data: mockProjects.map(p => p.likes),
-    backgroundColor: C_PRIMARY,
-    borderColor: C_BORDER,
-    borderWidth: 2,
-  }],
-}
 const likesOptions: ChartOptions<'bar'> = {
   responsive: true,
   maintainAspectRatio: false,
   plugins: { legend: { display: false }, tooltip },
   scales: {
     x: { ticks: { ...tick, maxRotation: 35 }, grid: { display: false }, border: axisBorder },
-    y: { beginAtZero: true, ticks: { ...tick, stepSize: 10 }, grid, border: axisBorder },
+    y: { beginAtZero: true, ticks: { ...tick, stepSize: 5 }, grid, border: axisBorder },
   },
 }
 
-// ─── Chart 3: Comments per Project (Bar) ─────────────────────────────────────
-const commentsData = {
-  labels: shortTitles,
-  datasets: [{
-    label: 'Comments',
-    data: mockProjects.map(p => p.comments),
-    backgroundColor: C_FG,
-    borderColor: C_PRIMARY,
-    borderWidth: 2,
-  }],
-}
 const commentsOptions: ChartOptions<'bar'> = {
   ...likesOptions,
   plugins: { legend: { display: false }, tooltip },
@@ -137,65 +139,50 @@ const headings: Record<AdminTab, { title: string; sub: string }> = {
   dynamo:   { title: 'DynamoDB Logs',       sub: 'NoSQL audit and access logs' },
 }
 
-// ─── Overview stat cards ─────────────────────────────────────────────────────
-const overviewCards = [
-  { label: 'TOTAL PROJECTS', value: String(mockProjects.length), subtext: 'in mock dataset',    highlight: false },
-  { label: 'TOTAL COMMENTS', value: String(mockComments.length), subtext: 'across all projects', highlight: false },
-  { label: 'TOTAL LIKES',    value: String(mockLikes.length),    subtext: 'across all projects', highlight: true  },
-]
-
-// ─── S3 stat cards ───────────────────────────────────────────────────────────
-// 🌐 API: GET /admin/s3-stats → S3 ListObjectsV2 → count + total size
-const s3Cards = [
-  { label: 'TOTAL FILES',   value: String(mockS3Stats.fileCount), subtext: 'cover images + PDFs',  highlight: false },
-  { label: 'STORAGE USED',  value: `${mockS3Stats.storageMB} MB`, subtext: 'of 5 GB free tier',    highlight: false },
-  { label: 'BUCKET REGION', value: mockS3Stats.bucketRegion,      subtext: 'Singapore',             highlight: true  },
-]
-
-// ─── S3 object table rows ────────────────────────────────────────────────────
-// 🌐 API: GET /admin/s3-objects → S3 ListObjectsV2 full response
-const s3ObjectRows = mockS3Objects.map(obj => [
-  obj.key,
-  `${obj.sizeMB} MB`,
-  obj.lastModified.replace('T', ' ').replace('Z', ''),
+// ─── Stat cards ─────────────────────────────────────────────────────────────
+const overviewCards = computed(() => [
+  { label: 'TOTAL PROJECTS', value: String(projects.value.length), subtext: 'in RDS database',    highlight: false },
+  { label: 'TOTAL COMMENTS', value: String(comments.value.length), subtext: 'across all projects', highlight: false },
+  { label: 'TOTAL LIKES',    value: String(likes.value.length),    subtext: 'across all projects', highlight: true  },
 ])
 
-// ─── RDS table rows ──────────────────────────────────────────────────────────
-const projectRows = mockProjects.map((p, i) => [
+const s3Cards = computed(() => [
+  { label: 'TOTAL FILES',   value: String(s3Stats.value?.fileCount ?? 0), subtext: 'cover images + PDFs',  highlight: false },
+  { label: 'STORAGE USED',  value: `${s3Stats.value?.storageMB ?? 0} MB`, subtext: 'S3 object storage', highlight: false },
+  { label: 'BUCKET REGION', value: s3Stats.value?.bucketRegion ?? '—',      subtext: 'AWS infrastructure', highlight: true  },
+])
+
+// ─── Table rows ──────────────────────────────────────────────────────────────
+const projectRows = computed(() => projects.value.map((p, i) => [
   String(i + 1), p.title, p.author,
   p.coverImageKey ?? '—', p.pdfKey ?? '—', p.demoUrl ?? '—', p.createdAt,
-])
-const commentRows = mockComments.map((c, i) => {
-  const project = mockProjects.find(p => p.id === c.projectId)
+]))
+
+const commentRows = computed(() => comments.value.map((c, i) => {
+  const proj = projects.value.find(p => p.id === c.projectId)
   return [
     String(i + 1),
     c.body.length > 60 ? c.body.slice(0, 60) + '...' : c.body,
-    c.author, project?.title ?? '—', c.createdAt,
+    c.author, proj?.title ?? '—', c.createdAt,
   ]
-})
-const likeRows = mockLikes.map((l, i) => [
-  String(i + 1), l.projectTitle, l.likedBy, l.createdAt,
-])
+}))
 
-// ─── Health check state ─────────────────────────────────────────────────────
-const missionStore = useMissionStore()
-const isLoading = ref(true)
-const apiError = ref<string | null>(null)
+const likeRows = computed(() => likes.value.map((l, i) => [
+  String(i + 1), l.projectTitle || '—', l.likedBy, l.createdAt,
+]))
 
+const s3Rows = computed(() => (s3Objects?.value || []).map((obj, i) => [
+  String(i + 1), obj.key, `${obj.sizeMB} MB`, String(obj.lastModified),
+]))
+
+// ─── Lifecycle ──────────────────────────────────────────────────────────────
 onMounted(async () => {
   try {
-    const url = import.meta.env.VITE_API_URL || 'http://localhost:3000'
-    await fetch(url)
-    
-    // Admin milestone unlocked upon successful reach of admin panel stats
+    await adminStore.fetchAll()
+    // 🏆 Gamification Trigger
     missionStore.completeMission('ADMIN')
-    
-    // Silent check for Infrastructure milestone connectivity
-    missionStore.checkHealth()
   } catch (err) {
-    apiError.value = `Unable to reach API at ${import.meta.env.VITE_API_URL || 'http://localhost:3000'}`
-  } finally {
-    isLoading.value = false
+    console.error('Failed to load admin data', err)
   }
 })
 </script>
@@ -251,12 +238,9 @@ onMounted(async () => {
     <main class="flex-1 p-6 md:p-10 overflow-y-auto mt-[52px] md:mt-0">
       <div class="max-w-6xl mx-auto space-y-8">
 
-        <!-- ── API Error State ────────────────────────────────────────────────── -->
-        <ErrorState v-if="apiError" :error="apiError" />
-
         <!-- ── Loading State ──────────────────────────────────────────────────── -->
-        <div v-else-if="isLoading" class="flex flex-col items-center justify-center py-24 gap-6">
-          <p class="text-muted font-bold uppercase text-sm font-mono animate-pulse">CONNECTING TO BACKEND...</p>
+        <div v-if="loading" class="flex flex-col items-center justify-center py-24 gap-6">
+          <p class="text-muted font-bold uppercase text-sm font-mono animate-pulse">FETCHING UPDATES...</p>
         </div>
 
         <template v-else>
@@ -268,192 +252,161 @@ onMounted(async () => {
             <p class="text-muted text-sm mt-1">{{ headings[activeTab].sub }}</p>
           </div>
 
+          <!-- TAB: OVERVIEW -->
+          <template v-if="activeTab === 'overview'">
+            <!-- Stat cards -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <AdminStatCard
+                v-for="card in overviewCards"
+                :key="card.label"
+                :label="card.label" :value="card.value"
+                :subtext="card.subtext" :highlight="card.highlight"
+              />
+            </div>
 
-        <!-- ═══════════════════════════════════════════════════════════════ -->
-        <!-- TAB: OVERVIEW                                                   -->
-        <!-- ═══════════════════════════════════════════════════════════════ -->
-        <template v-if="activeTab === 'overview'">
-          <!-- Stat cards -->
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <AdminStatCard
-              v-for="card in overviewCards"
-              :key="card.label"
-              :label="card.label" :value="card.value"
-              :subtext="card.subtext" :highlight="card.highlight"
-            />
-          </div>
+            <!-- Charts grid -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div class="bg-card border-2 border-border rounded-none shadow-[5px_5px_0px_var(--shadow)] p-6 h-72">
+                <h3 class="uppercase font-bold text-card-foreground text-sm border-b-2 border-border pb-2 mb-4">
+                  Daily Uploads
+                </h3>
+                <div class="h-[calc(100%-3.5rem)]">
+                  <Line :data="uploadsData" :options="uploadsOptions" />
+                </div>
+              </div>
 
-          <!-- Charts grid: 3 charts in a row on desktop, stacked on mobile -->
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div class="bg-card border-2 border-border rounded-none shadow-[5px_5px_0px_var(--shadow)] p-6 h-72">
+                <h3 class="uppercase font-bold text-card-foreground text-sm border-b-2 border-border pb-2 mb-4">
+                  Likes per Project
+                </h3>
+                <div class="h-[calc(100%-3.5rem)]">
+                  <Bar v-if="projects.length" :data="likesData" :options="likesOptions" />
+                  <p v-else class="text-muted text-xs h-full flex items-center justify-center">No data</p>
+                </div>
+              </div>
 
-            <!-- Chart 1: Daily Uploads — Line chart -->
-            <div class="bg-card border-2 border-border rounded-none shadow-[5px_5px_0px_var(--shadow)] p-6 h-72">
-              <h3 class="uppercase font-bold text-card-foreground text-sm border-b-2 border-border pb-2 mb-4">
-                Daily Uploads
+              <div class="bg-card border-2 border-border rounded-none shadow-[5px_5px_0px_var(--shadow)] p-6 h-72">
+                <h3 class="uppercase font-bold text-card-foreground text-sm border-b-2 border-border pb-2 mb-4">
+                  Comments per Project
+                </h3>
+                <div class="h-[calc(100%-3.5rem)]">
+                  <Bar v-if="projects.length" :data="commentsData" :options="commentsOptions" />
+                  <p v-else class="text-muted text-xs h-full flex items-center justify-center">No data</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Architecture summary -->
+            <div class="bg-card border-2 border-border rounded-none shadow-[5px_5px_0px_var(--shadow)] p-8">
+              <h3 class="text-lg font-bold uppercase text-primary mb-4 border-b-2 border-border pb-2">
+                AWS Architecture — Polyglot Persistence
               </h3>
-              <div class="h-[calc(100%-3.5rem)]">
-                <Line :data="uploadsData" :options="uploadsOptions" />
+              <p class="text-muted text-sm mb-6 leading-relaxed">
+                ProjectHub uses three AWS services — each handling the data it's best suited for.
+              </p>
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="border-2 border-border rounded-none p-4 border-l-[6px] border-l-primary">
+                  <p class="flex items-center gap-2 font-bold uppercase text-sm text-foreground mb-1">
+                    <Database :size="14" /> Amazon RDS
+                  </p>
+                  <p class="text-muted text-xs">Projects, Comments, Likes — relational data</p>
+                </div>
+                <div class="border-2 border-border rounded-none p-4 border-l-[6px] border-l-primary">
+                  <p class="flex items-center gap-2 font-bold uppercase text-sm text-foreground mb-1">
+                    <Cloud :size="14" /> Amazon S3
+                  </p>
+                  <p class="text-muted text-xs">Cover images & PDFs — object storage</p>
+                </div>
+                <div class="border-2 border-border rounded-none p-4 border-l-[6px] border-l-primary">
+                  <p class="flex items-center gap-2 font-bold uppercase text-sm text-foreground mb-1">
+                    <Zap :size="14" /> DynamoDB
+                  </p>
+                  <p class="text-muted text-xs">Audit trail — NoSQL event logging</p>
+                </div>
               </div>
             </div>
+          </template>
 
-            <!-- Chart 2: Likes per Project — Bar chart (gold) -->
-            <div class="bg-card border-2 border-border rounded-none shadow-[5px_5px_0px_var(--shadow)] p-6 h-72">
-              <h3 class="uppercase font-bold text-card-foreground text-sm border-b-2 border-border pb-2 mb-4">
-                Likes per Project
+          <!-- TAB: S3 STORAGE -->
+          <template v-if="activeTab === 's3'">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <AdminStatCard
+                v-for="card in s3Cards"
+                :key="card.label"
+                :label="card.label" :value="card.value"
+                :subtext="card.subtext" :highlight="card.highlight"
+              />
+            </div>
+
+            <div class="bg-card border-2 border-border rounded-none shadow-[6px_6px_0px_var(--shadow)] p-8">
+              <h3 class="text-xl font-bold uppercase text-primary mb-2 border-b-2 border-border pb-2">
+                S3 OBJECT LISTING
               </h3>
-              <div class="h-[calc(100%-3.5rem)]">
-                <Bar :data="likesData" :options="likesOptions" />
-              </div>
+              <p class="text-muted text-sm mb-6">
+                Active binary objects stored in your bucket.
+              </p>
+              
+              <AdminTable
+                v-if="s3Objects && s3Objects.length"
+                :columns="['#', 'OBJECT KEY', 'SIZE', 'LAST MODIFIED']"
+                :rows="s3Rows"
+                :pageSize="10"
+              />
+              <p v-else class="text-sm font-mono text-center py-10 border-2 border-dashed border-border text-muted">
+                NO OBJECTS FOUND IN BUCKET
+              </p>
             </div>
+          </template>
 
-            <!-- Chart 3: Comments per Project — Bar chart (black) -->
-            <div class="bg-card border-2 border-border rounded-none shadow-[5px_5px_0px_var(--shadow)] p-6 h-72">
-              <h3 class="uppercase font-bold text-card-foreground text-sm border-b-2 border-border pb-2 mb-4">
-                Comments per Project
-              </h3>
-              <div class="h-[calc(100%-3.5rem)]">
-                <Bar :data="commentsData" :options="commentsOptions" />
+          <!-- TAB: RDS DATA -->
+          <template v-if="activeTab === 'rds'">
+            <section class="space-y-3">
+              <div class="border-l-4 border-primary pl-3">
+                <h2 class="text-base font-bold uppercase text-foreground">Projects</h2>
+                <p class="text-muted text-xs">projects table in PostgreSQL</p>
               </div>
-            </div>
-          </div>
+              <AdminTable
+                v-if="projects.length"
+                :columns="['#', 'TITLE', 'BUILDER', 'COVER KEY', 'PDF KEY', 'DEMO URL', 'CREATED AT']"
+                :rows="projectRows"
+                :pageSize="5"
+              />
+              <p v-else class="text-muted text-sm italic">No projects found in RDS.</p>
+            </section>
 
-          <!-- AWS architecture summary -->
-          <div class="bg-card border-2 border-border rounded-none shadow-[5px_5px_0px_var(--shadow)] p-8">
-            <h3 class="text-lg font-bold uppercase text-primary mb-4 border-b-2 border-border pb-2">
-              AWS Architecture — Polyglot Persistence
-            </h3>
-            <p class="text-muted text-sm mb-6 leading-relaxed">
-              ProjectHub uses three AWS services — each handling the data it's best suited for.
-              Use the sidebar to dive into each service's data.
-            </p>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div class="border-2 border-border rounded-none p-4 border-l-[6px] border-l-primary">
-                <p class="flex items-center gap-2 font-bold uppercase text-sm text-foreground mb-1">
-                  <Database :size="14" /> Amazon RDS
-                </p>
-                <p class="text-muted text-xs">Projects, Comments, Likes — relational data with foreign keys</p>
+            <section class="space-y-3">
+              <div class="border-l-4 border-primary pl-3">
+                <h2 class="text-base font-bold uppercase text-foreground">Comments</h2>
+                <p class="text-muted text-xs">comments table in PostgreSQL</p>
               </div>
-              <div class="border-2 border-border rounded-none p-4 border-l-[6px] border-l-primary">
-                <p class="flex items-center gap-2 font-bold uppercase text-sm text-foreground mb-1">
-                  <Cloud :size="14" /> Amazon S3
-                </p>
-                <p class="text-muted text-xs">Cover images &amp; research PDFs — object storage, presigned URLs</p>
-              </div>
-              <div class="border-2 border-border rounded-none p-4 border-l-[6px] border-l-primary">
-                <p class="flex items-center gap-2 font-bold uppercase text-sm text-foreground mb-1">
-                  <Zap :size="14" /> DynamoDB
-                </p>
-                <p class="text-muted text-xs">Audit trail — AUTH, ACCESS, DATA events with 90-day TTL</p>
-              </div>
-            </div>
-          </div>
-        </template>
+              <AdminTable
+                v-if="comments.length"
+                :columns="['#', 'BODY', 'BUILDER', 'PROJECT', 'CREATED AT']"
+                :rows="commentRows"
+                :pageSize="5"
+              />
+              <p v-else class="text-muted text-sm italic">No comments found in RDS.</p>
+            </section>
 
-        <!-- ═══════════════════════════════════════════════════════════════ -->
-        <!-- TAB: S3 STORAGE                                                 -->
-        <!-- ═══════════════════════════════════════════════════════════════ -->
-        <template v-if="activeTab === 's3'">
-          <!-- Stat cards -->
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <AdminStatCard
-              v-for="card in s3Cards"
-              :key="card.label"
-              :label="card.label" :value="card.value"
-              :subtext="card.subtext" :highlight="card.highlight"
-            />
-          </div>
-
-          <!-- S3 Object listing table -->
-          <!-- 🌐 API: GET /admin/s3-objects → Hono calls S3 ListObjectsV2 -->
-          <!-- Returns: { Key, Size (bytes → converted to MB), LastModified } per object -->
-          <div class="bg-card border-2 border-border rounded-none shadow-[6px_6px_0px_var(--shadow)] p-8">
-            <h3 class="text-xl font-bold uppercase text-primary mb-2 border-b-2 border-border pb-2">
-              RECENT S3 OBJECTS
-            </h3>
-            <p class="text-muted text-sm mb-6">
-              In production, fetched via
-              <code class="bg-primary/10 text-primary border border-border px-1.5 py-0.5 text-xs font-mono rounded-none">GET /admin/s3-objects</code>
-              which calls S3
-              <code class="bg-primary/10 text-primary border border-border px-1.5 py-0.5 text-xs font-mono rounded-none">ListObjectsV2</code>.
-              Files are stored under two prefixes: <strong>covers/</strong> and <strong>pdfs/</strong>.
-            </p>
-            <AdminTable
-              :columns="['OBJECT KEY', 'SIZE', 'LAST MODIFIED']"
-              :rows="s3ObjectRows"
-              :pageSize="5"
-            />
-          </div>
-        </template>
-
-        <!-- ═══════════════════════════════════════════════════════════════ -->
-        <!-- TAB: RDS DATA                                                   -->
-        <!-- ═══════════════════════════════════════════════════════════════ -->
-        <template v-if="activeTab === 'rds'">
-          <section class="space-y-3">
-            <div class="border-l-4 border-primary pl-3">
-              <h2 class="text-base font-bold uppercase text-foreground">Projects</h2>
-              <p class="text-muted text-xs">projects JOIN users</p>
-            </div>
-            <AdminTable
-              :columns="['#', 'TITLE', 'BUILDER', 'COVER KEY', 'PDF KEY', 'DEMO URL', 'CREATED AT']"
-              :rows="projectRows"
-              :pageSize="5"
-            />
-          </section>
-
-          <section class="space-y-3">
-            <div class="border-l-4 border-primary pl-3">
-              <h2 class="text-base font-bold uppercase text-foreground">Comments</h2>
-              <p class="text-muted text-xs">comments JOIN users JOIN projects</p>
-            </div>
-            <AdminTable
-              :columns="['#', 'BODY', 'BUILDER', 'PROJECT', 'CREATED AT']"
-              :rows="commentRows"
-              :pageSize="5"
-            />
-          </section>
-
-          <section class="space-y-3">
-            <div class="border-l-4 border-primary pl-3">
-              <h2 class="text-base font-bold uppercase text-foreground">Likes</h2>
-              <p class="text-muted text-xs">likes JOIN users JOIN projects</p>
-            </div>
-            <AdminTable
-              :columns="['#', 'PROJECT', 'LIKED BY', 'TIMESTAMP']"
-              :rows="likeRows"
-              :pageSize="5"
-            />
-          </section>
-        </template>
-
-        <!-- ═══════════════════════════════════════════════════════════════ -->
-        <!-- TAB: DYNAMODB LOGS                                             -->
-        <!-- ═══════════════════════════════════════════════════════════════ -->
-        <template v-if="activeTab === 'dynamo'">
-          <div class="bg-card border-2 border-border rounded-none shadow-[5px_5px_0px_var(--shadow)] p-6">
-            <h3 class="text-base font-bold uppercase text-primary mb-3">DynamoDB Configuration</h3>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm font-mono">
-              <div>
-                <p class="text-muted text-xs uppercase font-bold mb-1">Table Name</p>
-                <code class="bg-primary/10 text-primary border border-border px-2 py-1 text-xs rounded-none block">projecthub-[your-name]-events</code>
+            <section class="space-y-3">
+              <div class="border-l-4 border-primary pl-3">
+                <h2 class="text-base font-bold uppercase text-foreground">Likes</h2>
+                <p class="text-muted text-xs">likes table in PostgreSQL</p>
               </div>
-              <div>
-                <p class="text-muted text-xs uppercase font-bold mb-1">Key Schema</p>
-                <code class="bg-primary/10 text-primary border border-border px-2 py-1 text-xs rounded-none block">PK: userId · SK: timestamp#uuid</code>
-              </div>
-              <div>
-                <p class="text-muted text-xs uppercase font-bold mb-1">Event Types</p>
-                <code class="bg-primary/10 text-primary border border-border px-2 py-1 text-xs rounded-none block">AUTH · ACCESS · DATA</code>
-              </div>
-              <div>
-                <p class="text-muted text-xs uppercase font-bold mb-1">TTL</p>
-                <code class="bg-primary/10 text-primary border border-border px-2 py-1 text-xs rounded-none block">expiresAt — auto-deletes after 90 days</code>
-              </div>
-            </div>
-          </div>
-          <LogTabs />
-        </template>
-        
+              <AdminTable
+                v-if="likes.length"
+                :columns="['#', 'PROJECT', 'LIKED BY', 'TIMESTAMP']"
+                :rows="likeRows"
+                :pageSize="5"
+              />
+              <p v-else class="text-muted text-sm italic">No likes found in RDS.</p>
+            </section>
+          </template>
+
+          <!-- TAB: DYNAMODB LOGS -->
+          <template v-if="activeTab === 'dynamo'">
+            <LogTabs />
+          </template>
         </template>
       </div>
     </main>

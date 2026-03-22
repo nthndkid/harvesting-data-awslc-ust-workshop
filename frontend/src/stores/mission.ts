@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import confetti from 'canvas-confetti'
 
-type MissionId = 'SERVER' | 'RDS' | 'S3' | 'DYNAMO' | 'UPLOAD' | 'ENGAGEMENT' | 'ADMIN'
+type MissionId = 'SERVER' | 'RDS' | 'S3' | 'DYNAMO' | 'UPLOAD' | 'LIKE' | 'ADMIN'
 
 export const useMissionStore = defineStore('mission', () => {
   const missions = ref({
@@ -13,7 +13,7 @@ export const useMissionStore = defineStore('mission', () => {
     DYNAMO: false,
     // Action missions: persistent local state
     UPLOAD: localStorage.getItem('ph_mission_UPLOAD') === 'true',
-    ENGAGEMENT: localStorage.getItem('ph_mission_ENGAGEMENT') === 'true',
+    LIKE: localStorage.getItem('ph_mission_LIKE') === 'true',
     ADMIN: localStorage.getItem('ph_mission_ADMIN') === 'true',
   })
 

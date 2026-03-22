@@ -7,9 +7,15 @@ import NameModal from '@/components/NameModal.vue'
 // ─── Store imports ──────────────────────────────────────────────────────────
 import { useAuthStore } from '@/stores/auth'
 
+import { onMounted } from 'vue'
+
 // ─── Store access ───────────────────────────────────────────────────────────
-// isAuthenticated drives the app gate — NameModal shows until name is entered
-const { isAuthenticated } = storeToRefs(useAuthStore())
+const authStore = useAuthStore()
+const { isAuthenticated } = storeToRefs(authStore)
+
+onMounted(async () => {
+  await authStore.tryAutoLogin()
+})
 </script>
 
 <template>

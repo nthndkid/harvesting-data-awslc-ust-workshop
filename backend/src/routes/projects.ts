@@ -5,8 +5,8 @@
 import { OpenAPIHono, createRoute } from '@hono/zod-openapi'
 import { z } from '@hono/zod-openapi'
 import { db } from '../db'
-import { projects } from '../db/schema'
-import { eq } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
+import { users, projects, likes, comments as commentsTable } from '../db/schema'
 import { logAccess, logData } from '../lib/dynamo'
 import { createProjectSchema, ProjectIdParamsSchema, ErrorSchema, SuccessMessageSchema } from '../lib/validators'
 import { getPresignedUrl } from '../lib/s3'
@@ -34,8 +34,24 @@ const getProjectsRoute = createRoute({
 
 router.openapi(getProjectsRoute, async (c) => {
   try {
-    // RDS: querying projects table
-    const allProjects = await db.select().from(projects)
+    // RDS: querying projects table with JOINs and Aggregations
+    // Using a more complex query to get userName, likesCount and commentsCount
+    const allProjects = await db.select({
+      projectId: projects.projectId,
+      title: projects.title,
+      description: projects.description,
+      tags: projects.tags,
+      demoUrl: projects.demoUrl,
+      coverImageKey: projects.coverImageKey,
+      pdfKey: projects.pdfKey,
+      createdAt: projects.createdAt,
+      userId: projects.userId,
+      userName: users.userName,
+      likesCount: sql<number>`(SELECT count(*) FROM ${likes} WHERE ${likes.projectId} = ${projects.projectId})`.mapWith(Number),
+      commentsCount: sql<number>`(SELECT count(*) FROM ${commentsTable} WHERE ${commentsTable.projectId} = ${projects.projectId})`.mapWith(Number)
+    })
+    .from(projects)
+    .leftJoin(users, eq(projects.userId, users.userId))
     
     // DynamoDB: database event log
     await logAccess({
@@ -77,8 +93,24 @@ router.openapi(getProjectRoute, async (c) => {
   const { id } = c.req.valid('param')
   
   try {
-    // RDS: querying projects table
-    const [project] = await db.select().from(projects).where(eq(projects.projectId, id))
+    // RDS: querying projects table with JOIN
+    const [project] = await db.select({
+      projectId: projects.projectId,
+      title: projects.title,
+      description: projects.description,
+      tags: projects.tags,
+      demoUrl: projects.demoUrl,
+      coverImageKey: projects.coverImageKey,
+      pdfKey: projects.pdfKey,
+      createdAt: projects.createdAt,
+      userId: projects.userId,
+      userName: users.userName,
+      likesCount: sql<number>`(SELECT count(*) FROM ${likes} WHERE ${likes.projectId} = ${projects.projectId})`.mapWith(Number),
+      commentsCount: sql<number>`(SELECT count(*) FROM ${commentsTable} WHERE ${commentsTable.projectId} = ${projects.projectId})`.mapWith(Number)
+    })
+    .from(projects)
+    .where(eq(projects.projectId, id))
+    .leftJoin(users, eq(projects.userId, users.userId))
     
     if (!project) {
       return c.json({ error: 'Project not found' }, 404)
