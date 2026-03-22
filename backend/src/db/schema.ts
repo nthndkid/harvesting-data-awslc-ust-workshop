@@ -10,7 +10,7 @@ import { pgTable, uuid, varchar, text, timestamp } from 'drizzle-orm/pg-core'
 // Users are identified strictly by their name
 export const users = pgTable('users', {
     userId: uuid('users_id').primaryKey().defaultRandom(),
-    name: varchar('name', { length: 100 }).notNull().unique(),
+    userName: varchar('userName', { length: 100 }).notNull().unique(),
     createdAt: timestamp('created_at').defaultNow(),
 })
 
@@ -21,6 +21,7 @@ export const projects = pgTable('projects', {
     userId: uuid('user_id').notNull().references(() => users.userId),
     title: varchar('title', { length: 255 }).notNull(),
     description: text('description').notNull(),
+    tags: varchar('tags', { length: 255 }).notNull(),
     coverImageKey: text('cover_image_key'), // S3: covers/uuid.jpg
     pdfKey: text('pdf_key'),                // S3: pdfs/uuid.pdf
     demoUrl: varchar('demo_url', { length: 500 }),

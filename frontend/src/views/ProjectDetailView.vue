@@ -1,14 +1,16 @@
 <script setup lang="ts">
 // ─── Vue core imports ───────────────────────────────────────────────────────
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 // ─── Vue Router imports ─────────────────────────────────────────────────────
 import { useRoute, RouterLink } from 'vue-router'
 // ─── Pinia imports ──────────────────────────────────────────────────────────
 import { storeToRefs } from 'pinia'
 // ─── Component imports ──────────────────────────────────────────────────────
 import CommentItem from '@/components/CommentItem.vue'
+import ErrorState from '@/components/ErrorState.vue'
 // ─── Store imports ──────────────────────────────────────────────────────────
 import { useAuthStore } from '@/stores/auth'
+import { useMissionStore } from '@/stores/mission'
 import {
   User,
   Image as ImageIcon,
@@ -27,24 +29,36 @@ const id = route.params.id as string
 
 // ─── Store access ───────────────────────────────────────────────────────────
 const { username } = storeToRefs(useAuthStore())
+const missionStore = useMissionStore()
 
 // ─── Data source ────────────────────────────────────────────────────────────
-// 🌐 API: GET /projects/:id
-// → Returns single project from RDS PostgreSQL
-// Currently: finding by id in mockProjects array
-const project = mockProjects.find(p => p.id === id)
-
-// Load comments for this project into local ref (so new comments can be added)
-// 🌐 API: GET /projects/:id/comments
-// Currently: filtering mockComments by projectId
-const comments = ref<Comment[]>(
-  mockComments.filter(c => c.projectId === id)
-)
+const project = ref<typeof mockProjects[0] | null>(null)
+const comments = ref<Comment[]>([])
+const isLoading = ref(true)
+const apiError = ref<string | null>(null)
 
 // ─── Local state ────────────────────────────────────────────────────────────
-// Like toggle — local state only in mock build
 const isLiked = ref(false)
-const likeCount = ref(project?.likes ?? 0)
+const likeCount = ref(0)
+
+onMounted(async () => {
+  try {
+    const url = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+    await fetch(url)
+    
+    // Load mock data on success
+    const found = mockProjects.find(p => p.id === id)
+    if (found) {
+      project.value = found
+      likeCount.value = found.likes ?? 0
+    }
+    comments.value = mockComments.filter(c => c.projectId === id)
+  } catch (err) {
+    apiError.value = `Unable to reach API at ${import.meta.env.VITE_API_URL || 'http://localhost:3000'}`
+  } finally {
+    isLoading.value = false
+  }
+})
 
 // New comment form
 const newCommentBody = ref('')
@@ -63,6 +77,7 @@ function toggleLike() {
     likeCount.value--
   } else {
     likeCount.value++
+    missionStore.completeMission('ENGAGEMENT')
   }
   isLiked.value = !isLiked.value
 }
@@ -102,10 +117,18 @@ function handleCommentSubmit() {
 <template>
   <div class="max-w-3xl mx-auto px-6 py-10">
 
+    <!-- ── API Error State ────────────────────────────────────────────────── -->
+    <ErrorState v-if="apiError" :error="apiError" />
+
+    <!-- ── Loading State ──────────────────────────────────────────────────── -->
+    <div v-else-if="isLoading" class="flex flex-col items-center justify-center py-24 gap-6">
+      <p class="text-muted font-bold uppercase text-sm font-mono animate-pulse">CONNECTING TO BACKEND...</p>
+    </div>
+
     <!-- ── Not Found State ────────────────────────────────────────────────── -->
     <!-- Shown when the project id doesn't match any mock project -->
     <div
-      v-if="!project"
+      v-else-if="!project"
       class="flex flex-col items-center justify-center py-24 gap-6"
     >
       <div class="bg-card border-2 border-border rounded-none shadow-[5px_5px_0px_var(--shadow)] p-10 text-center">

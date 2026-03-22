@@ -1,23 +1,47 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// RDS Connection — ProjectHub Polyglot Persistence
-// This file initializes the Drizzle ORM client with the PostgreSQL driver
-// ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// DB Connection setup (postgres.js + Drizzle ORM)
+// ─────────────────────────────────────────────
 
-import 'dotenv/config'
 import { drizzle } from 'drizzle-orm/postgres-js'
 import postgres from 'postgres'
 import * as schema from './schema'
 
-//  RDS — Database connection string parameters
-// These environment variables are configured in your .env file
+// DB_HOST comes from: RDS Console → your instance → Connectivity & security → Endpoint
+const dbUser = process.env.DB_USER || 'placeholder'
+const dbPass = process.env.DB_PASSWORD || 'placeholder'
+const dbHost = process.env.DB_HOST || 'localhost'
+const dbPort = process.env.DB_PORT || '5432'
+const dbName = process.env.DB_NAME || 'projecthub'
+
+// We pass the credentials safely as an object object instead of a URL string.
+// This prevents passwords that contain special characters (like @ or #) from breaking the parser!
 const client = postgres({
-    host: process.env.DB_HOST!,
-    port: Number(process.env.DB_PORT) || 5432,
-    database: process.env.DB_NAME!,
-    username: process.env.DB_USER!,
-    password: process.env.DB_PASSWORD!,
-    ssl: 'require',  // RDS requires SSL for secure connections — leave this enabled!
+    host: dbHost,
+    port: parseInt(dbPort),
+    database: dbName,
+    username: dbUser,
+    password: dbPass,
+    ssl: 'require'
 })
 
-// RDS — Initialize Drizzle with our schema for type-safe queries
 export const db = drizzle(client, { schema })
+
+// Function to dynamically check database health for the frontend milestone modal
+export async function checkRDSConnection(): Promise<boolean> {
+  try {
+    await client`SELECT 1`
+    return true
+  } catch {
+    return false
+  }
+}
+
+// Async IIFE to test the database connection on startup
+;(async () => {
+    const isConnected = await checkRDSConnection()
+    if (isConnected) {
+        console.log('✅ Connected to RDS PostgreSQL successfully!')
+    } else {
+        console.error('❌ Failed to connect to RDS PostgreSQL. Check your .env setup.')
+    }
+})()
