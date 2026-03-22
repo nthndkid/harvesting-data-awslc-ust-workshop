@@ -11,9 +11,7 @@ import { logAccess, logData } from '../lib/dynamo'
 import { createProjectSchema, ProjectIdParamsSchema, ErrorSchema, SuccessMessageSchema } from '../lib/validators'
 import { getPresignedUrl } from '../lib/s3'
 
-// Import sub-routers
-import commentsRoutes from './comments'
-import likesRoutes from './likes'
+// Export router securely
 
 const router = new OpenAPIHono()
 
@@ -299,8 +297,5 @@ router.openapi(getCoverRoute, async (c) => {
   }
 })
 
-// Sub-routers for comments and likes
-router.route('/', commentsRoutes)
-router.route('/', likesRoutes)
-
+// Sub-routers for comments and likes are handled natively in index.ts
 export default router

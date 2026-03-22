@@ -10,39 +10,55 @@ import authRoutes from './routes/auth'
 import projectRoutes from './routes/projects'
 import uploadRoutes from './routes/uploads'
 import adminRoutes from './routes/admin'
+import commentRoutes from './routes/comments'
+import likeRoutes from './routes/likes'
 
 const app = new OpenAPIHono()
 
-// Allow requests from the Vue frontend
-app.use('*', cors({ origin: 'http://localhost:5173' }))
+// ─── CORS ─────────────────────────────────────────────────────────────────────
+// x-user-id must be in allowHeaders — the frontend sends it on every request
+// so the backend can identify who triggered each DynamoDB audit log entry
+app.use('*', cors({
+  origin: 'http://localhost:5173',
+  allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowHeaders: ['Content-Type', 'x-user-id'],
+}))
 
-// Setup OpenAPI specification
+// ─── OpenAPI spec ─────────────────────────────────────────────────────────────
 app.doc('/doc', {
   openapi: '3.0.0',
   info: {
     version: '1.0.0',
     title: 'ProjectHub API',
-    description: 'API for ProjectHub Polyglot Persistence workshop. Remember to copy your UUID from the Auth route and place it where needed.',
+    description: 'API for ProjectHub Polyglot Persistence workshop. Copy your UUID from the Auth route and paste it into the x-user-id header.',
   },
 })
 
-// Register the UserId as a global security header parameter in Swagger UI
+// Register x-user-id as a global security scheme in Swagger UI
 app.openAPIRegistry.registerComponent('securitySchemes', 'UserIdHeader', {
   type: 'apiKey',
   in: 'header',
   name: 'x-user-id',
-  description: 'Provide your User ID to authenticate your actions (Optional for reading, Required for most writing)'
+  description: 'Your User ID from POST /auth/register or /auth/login. Required for write operations.',
 })
 
-// Setup Swagger UI route
+// ─── Swagger UI ───────────────────────────────────────────────────────────────
 app.get('/swagger', swaggerUI({ url: '/doc' }))
 
-// Register route groups
+// ─── Routes ───────────────────────────────────────────────────────────────────
 app.route('/auth', authRoutes)
 app.route('/projects', projectRoutes)
+app.route('/projects', commentRoutes)   // → /projects/:id/comments
+app.route('/projects', likeRoutes)      // → /projects/:id/like
 app.route('/uploads', uploadRoutes)
 app.route('/admin', adminRoutes)
 
+// ─── AppType export ───────────────────────────────────────────────────────────
+// Lets the frontend import types directly from the backend if needed
+// import type { AppType } from '../../../backend/src/index'
+export type AppType = typeof app
+
+// ─── Bun server ───────────────────────────────────────────────────────────────
 export default {
   port: 3000,
   fetch: app.fetch,
