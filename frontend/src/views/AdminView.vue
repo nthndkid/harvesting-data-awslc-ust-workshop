@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // ─── Vue core imports ───────────────────────────────────────────────────────
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 // ─── Charts (vue-chartjs + Chart.js) ────────────────────────────────────────
 import { Line, Bar } from 'vue-chartjs'
 import {
@@ -11,10 +11,10 @@ import {
   Title, Tooltip, Legend, Filler,
 } from 'chart.js'
 import type { ChartOptions } from 'chart.js'
-// ─── Component imports ──────────────────────────────────────────────────────
 import AdminStatCard from '@/components/AdminStatCard.vue'
 import AdminTable from '@/components/AdminTable.vue'
 import LogTabs from '@/components/LogTabs.vue'
+import ErrorState from '@/components/ErrorState.vue'
 import {
   LayoutDashboard,
   Cloud,
@@ -175,6 +175,21 @@ const commentRows = mockComments.map((c, i) => {
 const likeRows = mockLikes.map((l, i) => [
   String(i + 1), l.projectTitle, l.likedBy, l.createdAt,
 ])
+
+// ─── Health check state ─────────────────────────────────────────────────────
+const isLoading = ref(true)
+const apiError = ref<string | null>(null)
+
+onMounted(async () => {
+  try {
+    const url = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+    await fetch(url)
+  } catch (err) {
+    apiError.value = `Unable to reach API at ${import.meta.env.VITE_API_URL || 'http://localhost:3000'}`
+  } finally {
+    isLoading.value = false
+  }
+})
 </script>
 
 <template>
@@ -228,13 +243,23 @@ const likeRows = mockLikes.map((l, i) => [
     <main class="flex-1 p-6 md:p-10 overflow-y-auto mt-[52px] md:mt-0">
       <div class="max-w-6xl mx-auto space-y-8">
 
-        <!-- Dynamic heading -->
-        <div class="border-l-[6px] border-primary pl-4">
-          <h1 class="text-4xl font-bold uppercase text-foreground tracking-wide">
-            {{ headings[activeTab].title }}
-          </h1>
-          <p class="text-muted text-sm mt-1">{{ headings[activeTab].sub }}</p>
+        <!-- ── API Error State ────────────────────────────────────────────────── -->
+        <ErrorState v-if="apiError" :error="apiError" />
+
+        <!-- ── Loading State ──────────────────────────────────────────────────── -->
+        <div v-else-if="isLoading" class="flex flex-col items-center justify-center py-24 gap-6">
+          <p class="text-muted font-bold uppercase text-sm font-mono animate-pulse">CONNECTING TO BACKEND...</p>
         </div>
+
+        <template v-else>
+          <!-- Dynamic heading -->
+          <div class="border-l-[6px] border-primary pl-4">
+            <h1 class="text-4xl font-bold uppercase text-foreground tracking-wide">
+              {{ headings[activeTab].title }}
+            </h1>
+            <p class="text-muted text-sm mt-1">{{ headings[activeTab].sub }}</p>
+          </div>
+
 
         <!-- ═══════════════════════════════════════════════════════════════ -->
         <!-- TAB: OVERVIEW                                                   -->
@@ -420,7 +445,8 @@ const likeRows = mockLikes.map((l, i) => [
           </div>
           <LogTabs />
         </template>
-
+        
+        </template>
       </div>
     </main>
   </div>

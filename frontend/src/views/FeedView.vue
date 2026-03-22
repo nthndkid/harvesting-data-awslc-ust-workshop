@@ -1,19 +1,33 @@
 <script setup lang="ts">
 // ─── Vue core imports ───────────────────────────────────────────────────────
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 // ─── Router imports ─────────────────────────────────────────────────────────
 import { RouterLink } from 'vue-router'
 // ─── Component imports ──────────────────────────────────────────────────────
 import ProjectCard from '@/components/ProjectCard.vue'
+import ErrorState from '@/components/ErrorState.vue'
 // ─── Type imports ───────────────────────────────────────────────────────────
 import type { Project } from '@/types/projecthub.types'
 
 // ─── Data source ────────────────────────────────────────────────────────────
 // 🌐 API: GET /projects
-// → Returns all projects from RDS — projects table joined with users
-// Currently: using mockProjects from src/data/mockData.ts
 import { mockProjects } from '@/data/mockData'
-const projects = ref<Project[]>([...mockProjects])
+
+const projects = ref<Project[]>([])
+const isLoading = ref(true)
+const apiError = ref<string | null>(null)
+
+onMounted(async () => {
+  try {
+    const url = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+    await fetch(url)
+    projects.value = [...mockProjects]
+  } catch (err) {
+    apiError.value = `Unable to reach API at ${import.meta.env.VITE_API_URL || 'http://localhost:3000'}`
+  } finally {
+    isLoading.value = false
+  }
+})
 </script>
 
 <template>
@@ -25,10 +39,18 @@ const projects = ref<Project[]>([...mockProjects])
       <p class="text-muted text-sm mt-1">Builds from the community</p>
     </div>
 
+    <!-- ── API Error State ────────────────────────────────────────────────── -->
+    <ErrorState v-if="apiError" :error="apiError" />
+
+    <!-- ── Loading State ──────────────────────────────────────────────────── -->
+    <div v-else-if="isLoading" class="flex flex-col items-center justify-center py-24 gap-6">
+      <p class="text-muted font-bold uppercase text-sm font-mono animate-pulse">CONNECTING TO BACKEND...</p>
+    </div>
+
     <!-- ── Empty state ────────────────────────────────────────────────────── -->
     <!-- Shown when no projects exist in the array -->
     <div
-      v-if="projects.length === 0"
+      v-else-if="projects.length === 0"
       class="flex flex-col items-center justify-center py-24 gap-6"
     >
       <p class="text-foreground font-bold uppercase text-2xl">NO PROJECTS YET</p>
