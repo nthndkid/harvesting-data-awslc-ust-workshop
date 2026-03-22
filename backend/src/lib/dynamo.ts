@@ -2,7 +2,7 @@
 // DynamoDB Unified Audit Trail helpers
 // ─────────────────────────────────────────────
 
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb'
+import { DynamoDBClient, DescribeTableCommand } from '@aws-sdk/client-dynamodb'
 import { DynamoDBDocumentClient, PutCommand } from '@aws-sdk/lib-dynamodb'
 import { randomUUID } from 'crypto'
 
@@ -61,3 +61,15 @@ export async function logData(params: { userId: string, action: 'CREATE' | 'DELE
   return writeEvent({ userId: params.userId, eventType: 'DATA', action: params.action, resourceId: params.resourceId, metadata: { entityType: params.entityType } })
     .catch(err => console.error('logData failed:', err))
 }
+
+// Async IIFE to test the DynamoDB connection on startup
+;(async () => {
+  try {
+    // We execute a DescribeTableCommand to verify the table exists and credentials are valid
+    await rawClient.send(new DescribeTableCommand({ TableName: getTable() }))
+    console.log('✅ Connected to AWS DynamoDB successfully!')
+  } catch (error) {
+    // If credentials fail or the table name isn't created properly, this will catch it
+    console.error('❌ Failed to connect to AWS DynamoDB. Check your .env setup.')
+  }
+})()
