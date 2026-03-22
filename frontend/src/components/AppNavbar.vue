@@ -1,15 +1,23 @@
 <script setup lang="ts">
 // ─── Vue core imports ───────────────────────────────────────────────────────
+import { ref, onMounted } from 'vue'
 import { RouterLink, useLink } from 'vue-router'
 // ─── Pinia imports ──────────────────────────────────────────────────────────
 import { storeToRefs } from 'pinia'
 // ─── Store imports ──────────────────────────────────────────────────────────
 import { useAuthStore } from '@/stores/auth'
-import { User } from 'lucide-vue-next'
+import { useMissionStore } from '@/stores/mission'
+import { User, Trophy } from 'lucide-vue-next'
+// ─── Component imports ──────────────────────────────────────────────────────
+import MissionModal from '@/components/MissionModal.vue'
+import CongratsModal from '@/components/CongratsModal.vue'
 
 // ─── Store access ───────────────────────────────────────────────────────────
 // Read username from auth store to display in the top-right badge
 const { username } = storeToRefs(useAuthStore())
+
+const missionStore = useMissionStore()
+const showMissionLog = ref(false)
 
 // ─── Nav links ──────────────────────────────────────────────────────────────
 // Centralized so additions only need one place changed
@@ -18,6 +26,12 @@ const navLinks = [
   { name: 'upload', label: 'UPLOAD' },
   { name: 'admin',  label: 'ADMIN' },
 ]
+
+// ─── Lifecycle ──────────────────────────────────────────────────────────────
+// Check infrastructure connectivity on any page reload
+onMounted(() => {
+  missionStore.checkHealth()
+})
 </script>
 
 <template>
@@ -34,6 +48,16 @@ const navLinks = [
 
     <!-- Right: Nav links + username badge -->
     <div class="flex items-center gap-6">
+
+      <!-- Mission Log Toggle -->
+      <button
+        @click="showMissionLog = true"
+        class="hidden sm:flex items-center gap-2 bg-background border-2 border-border px-3 py-1.5 hover:bg-muted font-bold text-xs uppercase shadow-[2px_2px_0px_var(--shadow)] hover:-translate-x-[2px] hover:-translate-y-[2px] hover:shadow-[4px_4px_0px_var(--shadow)] active:translate-x-0 active:translate-y-0 active:shadow-none transition-all duration-200 text-foreground"
+      >
+        <Trophy :size="14" class="text-primary" />
+        {{ missionStore.progressCount }} / 7 MISSIONS
+      </button>
+
       <!-- Navigation links -->
       <RouterLink
         v-for="link in navLinks"
@@ -51,4 +75,13 @@ const navLinks = [
       </span>
     </div>
   </nav>
+
+  <!-- Mission Log Modal -->
+  <MissionModal 
+    :isOpen="showMissionLog" 
+    @close="showMissionLog = false" 
+  />
+
+  <!-- Dedicated Congratulations Queue Modal -->
+  <CongratsModal />
 </template>

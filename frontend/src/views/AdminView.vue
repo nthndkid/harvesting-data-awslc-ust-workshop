@@ -15,6 +15,7 @@ import AdminStatCard from '@/components/AdminStatCard.vue'
 import AdminTable from '@/components/AdminTable.vue'
 import LogTabs from '@/components/LogTabs.vue'
 import ErrorState from '@/components/ErrorState.vue'
+import { useMissionStore } from '@/stores/mission'
 import {
   LayoutDashboard,
   Cloud,
@@ -177,6 +178,7 @@ const likeRows = mockLikes.map((l, i) => [
 ])
 
 // ─── Health check state ─────────────────────────────────────────────────────
+const missionStore = useMissionStore()
 const isLoading = ref(true)
 const apiError = ref<string | null>(null)
 
@@ -184,6 +186,12 @@ onMounted(async () => {
   try {
     const url = import.meta.env.VITE_API_URL || 'http://localhost:3000'
     await fetch(url)
+    
+    // Admin milestone unlocked upon successful reach of admin panel stats
+    missionStore.completeMission('ADMIN')
+    
+    // Silent check for Infrastructure milestone connectivity
+    missionStore.checkHealth()
   } catch (err) {
     apiError.value = `Unable to reach API at ${import.meta.env.VITE_API_URL || 'http://localhost:3000'}`
   } finally {

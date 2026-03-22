@@ -10,6 +10,7 @@ import CommentItem from '@/components/CommentItem.vue'
 import ErrorState from '@/components/ErrorState.vue'
 // ─── Store imports ──────────────────────────────────────────────────────────
 import { useAuthStore } from '@/stores/auth'
+import { useMissionStore } from '@/stores/mission'
 import {
   User,
   Image as ImageIcon,
@@ -28,6 +29,7 @@ const id = route.params.id as string
 
 // ─── Store access ───────────────────────────────────────────────────────────
 const { username } = storeToRefs(useAuthStore())
+const missionStore = useMissionStore()
 
 // ─── Data source ────────────────────────────────────────────────────────────
 const project = ref<typeof mockProjects[0] | null>(null)
@@ -75,6 +77,7 @@ function toggleLike() {
     likeCount.value--
   } else {
     likeCount.value++
+    missionStore.completeMission('ENGAGEMENT')
   }
   isLiked.value = !isLiked.value
 }

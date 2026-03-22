@@ -6,8 +6,10 @@ import { RouterLink } from 'vue-router'
 // ─── Component imports ──────────────────────────────────────────────────────
 import FileDropzone from '@/components/FileDropzone.vue'
 import { Image as ImageIcon, FileText } from 'lucide-vue-next'
+import { useMissionStore } from '@/stores/mission'
 
 // ─── Local state ────────────────────────────────────────────────────────────
+const missionStore = useMissionStore()
 const title = ref('')
 const description = ref('')
 const demoUrl = ref('')
@@ -52,6 +54,7 @@ async function handleSubmit() {
   const _tags = parseTags(tagsInput.value)  // Tags ready for API payload
   await new Promise(resolve => setTimeout(resolve, 800))
 
+  missionStore.completeMission('UPLOAD')
   isSubmitting.value = false
   isSuccess.value = true
 }
