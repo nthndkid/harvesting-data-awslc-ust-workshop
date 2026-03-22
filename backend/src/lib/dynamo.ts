@@ -3,7 +3,7 @@
 // ─────────────────────────────────────────────
 
 import { DynamoDBClient, DescribeTableCommand } from '@aws-sdk/client-dynamodb'
-import { DynamoDBDocumentClient, PutCommand } from '@aws-sdk/lib-dynamodb'
+import { DynamoDBDocumentClient, PutCommand, ScanCommand } from '@aws-sdk/lib-dynamodb'
 import { randomUUID } from 'crypto'
 
 const rawClient = new DynamoDBClient({
@@ -20,6 +20,19 @@ const dynamo = DynamoDBDocumentClient.from(rawClient)
 const ttl = () => Math.floor(Date.now() / 1000) + (90 * 24 * 60 * 60)
 
 const getTable = () => process.env.DYNAMODB_TABLE || 'projecthub-events'
+
+// Admin query method to view all audit tails, scanning the whole table for a workshop demo
+export async function getAuditTrail(eventType?: string) {
+  const command = new ScanCommand({
+    TableName: getTable(),
+    ...(eventType ? {
+      FilterExpression: 'eventType = :type',
+      ExpressionAttributeValues: { ':type': eventType }
+    } : {})
+  })
+  const response = await dynamo.send(command)
+  return response.Items || []
+}
 
 // Core write function: PK = userId, SK = timestamp#uuid
 async function writeEvent(params: {

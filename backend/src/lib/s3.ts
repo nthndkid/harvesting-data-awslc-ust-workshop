@@ -2,7 +2,7 @@
 // AWS S3 client and upload / presigned URL helpers
 // ─────────────────────────────────────────────
 
-import { S3Client, PutObjectCommand, GetObjectCommand, HeadBucketCommand } from '@aws-sdk/client-s3'
+import { S3Client, PutObjectCommand, GetObjectCommand, HeadBucketCommand, ListObjectsV2Command } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 
 // AWS_REGION comes from: the region you chose when creating your S3 bucket
@@ -18,27 +18,55 @@ const s3Client = new S3Client({
 // S3_BUCKET_NAME comes from: the bucket name you chose when creating it
 const getBucket = () => process.env.S3_BUCKET_NAME || 'placeholder-bucket'
 
-// Upload a file to S3 — returns the S3 key (not the full URL)
+// Calculate total storage and object counts for the bucket
+export async function getS3Stats() {
+  const command = new ListObjectsV2Command({ Bucket: getBucket() })
+  const response = await s3Client.send(command)
+  const objects = response.Contents || []
+  
+  let totalBytes = 0
+  for (const obj of objects) {
+    totalBytes += obj.Size || 0
+  }
+  
+  return {
+    fileCount: objects.length,
+    storageMB: Number((totalBytes / (1024 * 1024)).toFixed(2)),
+    bucketRegion: await s3Client.config.region()
+  }
+}
+
+// Fetch the Raw object list from the bucket
+export async function getS3Objects() {
+  const command = new ListObjectsV2Command({ Bucket: getBucket() })
+  const response = await s3Client.send(command)
+  
+  return (response.Contents || []).map(obj => ({
+    key: obj.Key,
+    sizeMB: Number(((obj.Size || 0) / (1024 * 1024)).toFixed(2)),
+    lastModified: obj.LastModified
+  }))
+}
+
+// Upload a file to S3 — returns the S3 key
 export async function uploadToS3(
   key: string,
   body: Buffer | Uint8Array | string,
   contentType: string
 ): Promise<string> {
-  // S3: PutObject: storing the file
   await s3Client.send(new PutObjectCommand({
     Bucket: getBucket(),
     Key: key,
     Body: body,
     ContentType: contentType,
   }))
-  return key // always return the key, never the full URL
+  return key 
 }
 
 // Generate a presigned URL for temporary access (15 minutes)
 export async function getPresignedUrl(key: string): Promise<string> {
-  // S3: GetObject: generating a temporary download link
   const command = new GetObjectCommand({ Bucket: getBucket(), Key: key })
-  return getSignedUrl(s3Client, command, { expiresIn: 900 }) // 900 seconds = 15 minutes
+  return getSignedUrl(s3Client, command, { expiresIn: 900 }) 
 }
 
 // Function to test bucket access on demand for the health endpoint
