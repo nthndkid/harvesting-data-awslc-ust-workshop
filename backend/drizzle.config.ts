@@ -1,6 +1,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Drizzle Config — ProjectHub Polyglot Persistence
-// This file configures Drizzle Kit for database push and schema management
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Drizzle Config — ProjectHub Polyglot Persistence
 // ─────────────────────────────────────────────────────────────────────────────
 
 import 'dotenv/config'
@@ -16,9 +19,8 @@ export default defineConfig({
         database: process.env.DB_NAME!,
         user: process.env.DB_USER!,
         password: process.env.DB_PASSWORD!,
-        ssl: 'require',
+        ssl: { rejectUnauthorized: false }
     },
     verbose: true,
     strict: true,
 })
-
