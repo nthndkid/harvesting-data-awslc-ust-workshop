@@ -41,14 +41,22 @@ export async function getPresignedUrl(key: string): Promise<string> {
   return getSignedUrl(s3Client, command, { expiresIn: 900 }) // 900 seconds = 15 minutes
 }
 
+// Function to test bucket access on demand for the health endpoint
+export async function checkS3Connection(): Promise<boolean> {
+  try {
+    await s3Client.send(new HeadBucketCommand({ Bucket: getBucket() }))
+    return true
+  } catch {
+    return false
+  }
+}
+
 // Async IIFE to test the S3 connection on startup
 ;(async () => {
-  try {
-    // We execute a HeadBucketCommand to verify the bucket exists and credentials are valid
-    await s3Client.send(new HeadBucketCommand({ Bucket: getBucket() }))
+  const isConnected = await checkS3Connection()
+  if (isConnected) {
     console.log('✅ Connected to AWS S3 successfully!')
-  } catch (error) {
-    // If credentials fail or the bucket name isn't set properly, this will catch it
+  } else {
     console.error('❌ Failed to connect to AWS S3. Check your .env setup.')
   }
 })()

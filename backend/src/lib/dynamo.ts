@@ -62,14 +62,22 @@ export async function logData(params: { userId: string, action: 'CREATE' | 'DELE
     .catch(err => console.error('logData failed:', err))
 }
 
+// Function to powerfully verify table connectivity for the /health checking
+export async function checkDynamoConnection(): Promise<boolean> {
+  try {
+    await rawClient.send(new DescribeTableCommand({ TableName: getTable() }))
+    return true
+  } catch {
+    return false
+  }
+}
+
 // Async IIFE to test the DynamoDB connection on startup
 ;(async () => {
-  try {
-    // We execute a DescribeTableCommand to verify the table exists and credentials are valid
-    await rawClient.send(new DescribeTableCommand({ TableName: getTable() }))
+  const isConnected = await checkDynamoConnection()
+  if (isConnected) {
     console.log('✅ Connected to AWS DynamoDB successfully!')
-  } catch (error) {
-    // If credentials fail or the table name isn't created properly, this will catch it
+  } else {
     console.error('❌ Failed to connect to AWS DynamoDB. Check your .env setup.')
   }
 })()

@@ -43,4 +43,38 @@ router.openapi(statsRoute, async (c) => {
   }
 })
 
+// GET /admin/health
+const healthRoute = createRoute({
+  method: 'get',
+  path: '/health',
+  tags: ['Admin'],
+  responses: {
+    200: {
+      description: 'Workshop service connections status',
+      content: { 'application/json': { 
+        schema: z.object({
+          rds: z.boolean(),
+          s3: z.boolean(),
+          dynamodb: z.boolean()
+        }).openapi('HealthStatusResponse')
+      }}
+    }
+  }
+})
+
+import { checkRDSConnection } from '../db'
+import { checkS3Connection } from '../lib/s3'
+import { checkDynamoConnection } from '../lib/dynamo'
+
+router.openapi(healthRoute, async (c) => {
+  // Check all 3 services concurrently
+  const [rds, s3, dynamodb] = await Promise.all([
+    checkRDSConnection(),
+    checkS3Connection(),
+    checkDynamoConnection()
+  ])
+
+  return c.json({ rds, s3, dynamodb }, 200)
+})
+
 export default router

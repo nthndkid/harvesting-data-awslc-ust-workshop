@@ -26,14 +26,22 @@ const client = postgres({
 
 export const db = drizzle(client, { schema })
 
-    // Async IIFE to test the database connection on startup
-    ; (async () => {
-        try {
-            // We execute a simple query to assert the connection works
-            await client`SELECT 1`
-            console.log('✅ Connected to RDS PostgreSQL successfully!')
-        } catch (error) {
-            // If the connection fails (like wrong password or hostname), we'll see it here
-            console.error('❌ Failed to connect to RDS PostgreSQL. Check your .env setup.')
-        }
-    })()
+// Function to dynamically check database health for the frontend milestone modal
+export async function checkRDSConnection(): Promise<boolean> {
+  try {
+    await client`SELECT 1`
+    return true
+  } catch {
+    return false
+  }
+}
+
+// Async IIFE to test the database connection on startup
+;(async () => {
+    const isConnected = await checkRDSConnection()
+    if (isConnected) {
+        console.log('✅ Connected to RDS PostgreSQL successfully!')
+    } else {
+        console.error('❌ Failed to connect to RDS PostgreSQL. Check your .env setup.')
+    }
+})()
