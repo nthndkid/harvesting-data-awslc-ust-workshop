@@ -69,9 +69,9 @@ export const useProjectsStore = defineStore('projects', () => {
     )
     
     // Updates local feed state if necessary
-    const idx = projects.value.findIndex(p => p.id === projectId)
-    if (idx !== -1) {
-      projects.value[idx].likes = data.count
+    const project = projects.value.find(p => p.id === projectId)
+    if (project && data) {
+      project.likes = data.count
     }
 
     // 🏆 Gamification Trigger
