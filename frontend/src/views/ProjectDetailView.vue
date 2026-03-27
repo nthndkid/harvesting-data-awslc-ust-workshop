@@ -196,28 +196,31 @@ async function handleCommentSubmit() {
         <p class="text-card-foreground text-sm leading-relaxed">{{ project.description }}</p>
       </div>
 
-      <!-- Live demo button (only if demoUrl exists) -->
-      <a
-        v-if="project.demoUrl"
-        :href="project.demoUrl"
-        target="_blank"
-        rel="noopener noreferrer"
-        class="block w-full bg-card text-card-foreground border-2 border-border rounded-none shadow-[4px_4px_0px_var(--shadow)] hover:-translate-x-[2px] hover:-translate-y-[2px] hover:shadow-[6px_6px_0px_var(--shadow)] active:translate-x-0 active:translate-y-0 active:shadow-none transition-all duration-200 font-bold uppercase text-center py-3 mb-4"
-      >
-        <div class="flex items-center justify-center gap-2">
-          <ExternalLink :size="18" /> VIEW LIVE DEMO →
-        </div>
-      </a>
+      <!-- Action Buttons Row -->
+      <div class="flex flex-col sm:flex-row gap-4 mb-6">
+        <!-- Live demo button (only if demoUrl exists) -->
+        <a
+          v-if="project.demoUrl"
+          :href="project.demoUrl"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="flex-1 bg-card text-card-foreground border-2 border-border rounded-none shadow-[4px_4px_0px_var(--shadow)] hover:-translate-x-[2px] hover:-translate-y-[2px] hover:shadow-[6px_6px_0px_var(--shadow)] active:translate-x-0 active:translate-y-0 active:shadow-none transition-all duration-200 font-bold uppercase text-center py-3"
+        >
+          <div class="flex items-center justify-center gap-2">
+            <ExternalLink :size="18" /> VIEW LIVE DEMO →
+          </div>
+        </a>
 
-      <!-- PDF download button -->
-      <button
-        @click="handlePdfDownload"
-        class="block w-full bg-primary text-primary-foreground border-2 border-border rounded-none shadow-[4px_4px_0px_var(--shadow)] hover:-translate-x-[2px] hover:-translate-y-[2px] hover:shadow-[6px_6px_0px_var(--shadow)] active:translate-x-0 active:translate-y-0 active:shadow-none transition-all duration-200 font-bold uppercase py-3 mb-6"
-      >
-        <div class="flex items-center justify-center gap-2">
-          <FileText :size="18" /> DOWNLOAD RESEARCH PDF →
-        </div>
-      </button>
+        <!-- PDF download button -->
+        <button
+          @click="handlePdfDownload"
+          class="flex-1 bg-primary text-primary-foreground border-2 border-border rounded-none shadow-[4px_4px_0px_var(--shadow)] hover:-translate-x-[2px] hover:-translate-y-[2px] hover:shadow-[6px_6px_0px_var(--shadow)] active:translate-x-0 active:translate-y-0 active:shadow-none transition-all duration-200 font-bold uppercase py-3"
+        >
+          <div class="flex items-center justify-center gap-2">
+            <FileText :size="18" /> DOWNLOAD RESEARCH PDF →
+          </div>
+        </button>
+      </div>
 
       <!-- Tag badges -->
       <div class="flex flex-wrap gap-2 mb-6">
