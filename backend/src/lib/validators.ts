@@ -10,7 +10,19 @@ export const createProjectSchema = z.object({
   tags: z.string().max(255).openapi({ example: 'react, aws, bun' }),
   coverImageKey: z.string().optional().openapi({ example: 'covers/abc-123.jpg' }),
   pdfKey: z.string().optional().openapi({ example: 'pdfs/abc-123.pdf' }),
-  demoUrl: z.string().url().optional().or(z.literal('')).openapi({ example: 'https://demo.projecthub.com' }),
+  demoUrl: z.string()
+    .optional()
+    .or(z.literal(''))
+    .transform((val) => {
+      if (!val || val.trim() === '') return undefined
+      let url = val.trim()
+      if (!/^https?:\/\//i.test(url)) {
+        return `https://${url}`
+      }
+      return url
+    })
+    .pipe(z.string().url().optional())
+    .openapi({ example: 'google.com' }),
   userId: z.string().uuid().openapi({ example: '3fa85f64-5717-4562-b3fc-2c963f66afa6' }),
 }).openapi('CreateProjectRequest')
 

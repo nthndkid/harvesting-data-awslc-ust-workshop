@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import confetti from 'canvas-confetti'
 
-type MissionId = 'SERVER' | 'RDS' | 'S3' | 'DYNAMO' | 'UPLOAD' | 'LIKE' | 'ADMIN'
+type MissionId = 'SERVER' | 'RDS' | 'S3' | 'DYNAMO' | 'UPLOAD' | 'LIKE' | 'ADMIN' | 'COMMENT'
 
 export const useMissionStore = defineStore('mission', () => {
   const missions = ref({
@@ -15,13 +15,14 @@ export const useMissionStore = defineStore('mission', () => {
     UPLOAD: localStorage.getItem('ph_mission_UPLOAD') === 'true',
     LIKE: localStorage.getItem('ph_mission_LIKE') === 'true',
     ADMIN: localStorage.getItem('ph_mission_ADMIN') === 'true',
+    COMMENT: localStorage.getItem('ph_mission_COMMENT') === 'true',
   })
 
   // Computed properties for UI
   const progressCount = computed(() => {
     return Object.values(missions.value).filter(Boolean).length
   })
-  const isAllComplete = computed(() => progressCount.value === 7)
+  const isAllComplete = computed(() => progressCount.value === 8)
 
   // Queue system for congratulations modals
   const congratsQueue = ref<MissionId[]>([])

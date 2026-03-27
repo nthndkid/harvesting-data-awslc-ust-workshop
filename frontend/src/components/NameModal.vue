@@ -43,22 +43,24 @@ function handleSubmit() {
 
         <!-- Name form -->
         <form @submit.prevent="handleSubmit" class="flex flex-col gap-6">
-          <!-- Name input — gold focus ring for Neobrutalist style -->
           <input
             id="name-input"
             v-model="nameInput"
             type="text"
             placeholder="Your name..."
             autofocus
-            class="bg-card text-card-foreground border-2 border-border rounded-none focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background px-4 py-3 w-full font-mono text-base"
+            :disabled="authStore.loading"
+            class="bg-card text-card-foreground border-2 border-border rounded-none focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background px-4 py-3 w-full font-mono text-base disabled:opacity-50"
           />
 
           <!-- Submit button — full width primary -->
           <button
             type="submit"
-            class="w-full bg-primary text-primary-foreground border-2 border-border rounded-none shadow-[4px_4px_0px_var(--shadow)] hover:-translate-x-[2px] hover:-translate-y-[2px] hover:shadow-[6px_6px_0px_var(--shadow)] active:translate-x-0 active:translate-y-0 active:shadow-none transition-all duration-200 font-bold uppercase py-3 text-lg"
+            :disabled="authStore.loading"
+            class="w-full bg-primary text-primary-foreground border-2 border-border rounded-none shadow-[4px_4px_0px_var(--shadow)] hover:-translate-x-[2px] hover:-translate-y-[2px] hover:shadow-[6px_6px_0px_var(--shadow)] active:translate-x-0 active:translate-y-0 active:shadow-none transition-all duration-200 font-bold uppercase py-3 text-lg disabled:opacity-50 flex items-center justify-center gap-2"
           >
-            LET'S GO →
+            <span v-if="authStore.loading">AUTHENTICATING...</span>
+            <span v-else>LET'S GO →</span>
           </button>
         </form>
       </div>

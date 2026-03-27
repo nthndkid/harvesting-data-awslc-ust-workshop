@@ -54,6 +54,12 @@ const missions = [
     title: 'DATA ADMIN',
     desc: 'Load the Admin Dashboard stats',
     status: () => missionStore.missions.ADMIN
+  },
+  {
+    id: 'COMMENT',
+    title: 'VALUABLE CONTRIBUTOR',
+    desc: 'Post a comment on any project in the feed',
+    status: () => missionStore.missions.COMMENT
   }
 ]
 </script>
@@ -84,7 +90,7 @@ const missions = [
         <!-- Scrollable Body -->
         <div class="p-6 md:p-8 overflow-y-auto flex-1">
           <p class="text-sm text-foreground font-mono leading-relaxed mb-6">
-            Complete all seven missions to establish your polyglot persistence architecture and unlock your workshop rewards.
+            Complete all eight missions to establish your polyglot persistence architecture and unlock your workshop rewards.
           </p>
 
           <div class="space-y-4">
@@ -149,7 +155,7 @@ const missions = [
             PROGRESS
           </span>
           <span class="bg-primary text-primary-foreground font-bold px-3 py-1 font-mono text-lg border-2 border-border shadow-[2px_2px_0px_var(--shadow)]">
-            {{ missionStore.progressCount }} / 7
+            {{ missionStore.progressCount }} / 8
           </span>
         </div>
       </div>
