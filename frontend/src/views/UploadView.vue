@@ -7,11 +7,9 @@ import { RouterLink } from 'vue-router'
 import FileDropzone from '@/components/FileDropzone.vue'
 import { Image as ImageIcon, FileText } from 'lucide-vue-next'
 import { useUploadStore } from '@/stores/upload'
-import { useAuthStore } from '@/stores/auth'
 
 // ─── Local state ────────────────────────────────────────────────────────────
 const uploadStore = useUploadStore()
-const authStore = useAuthStore()
 const title = ref('')
 const description = ref('')
 const demoUrl = ref('')
@@ -41,50 +39,30 @@ function parseTags(raw: string): string[] {
 
 // Submit handler
 async function handleSubmit() {
-  const parsedTags = parseTags(tagsInput.value)
-  
-  // 1. Validation (Pre-Check)
-  const userId = localStorage.getItem('ph_userid')
-  if (!userId || !authStore.isUserIdUuid) {
-    submitError.value = 'PROJECTS CAN ONLY BE SUBMITED WITH A VALID SESSION. TRY REFRESHING.'
+  if (!title.value.trim() || !description.value.trim() || !pdfFile.value) {
+    submitError.value = 'PLEASE PROVIDE TITLE, DESCRIPTION, AND RESEARCH PDF'
     return
   }
 
-  if (!title.value.trim() || title.value.length < 3) {
-    submitError.value = 'TITLE MUST BE AT LEAST 3 CHARACTERS'
-    return
-  }
-  if (!description.value.trim() || description.value.length < 10) {
-    submitError.value = 'DESCRIPTION MUST BE AT LEAST 10 CHARACTERS'
-    return
-  }
-  if (parsedTags.join(', ').length > 255) {
-    submitError.value = 'TAGS ARE TOO LONG (MAX 255 CHARS)'
-    return
-  }
-  if (!pdfFile.value) {
-    submitError.value = 'A RESEARCH PDF IS REQUIRED'
-    return
-  }
-  if (!pdfFile.value.name.toLowerCase().endsWith('.pdf')) {
-    submitError.value = 'RESEARCH FILE MUST BE A PDF'
-    return
-  }
-  
-  // Basic validation already improved by backend normalization
-  // No more separate S3 uploads — we send files directly in the project create call
   isSubmitting.value = true
   submitError.value = null
 
   try {
-    // 🚀 NEW ATOMIC WAY: Send metadata + files in ONE request
+    // 1. Upload files to S3 first, get back the keys
+    let coverKey: string | null = null
+    if (coverFile.value) {
+      coverKey = await uploadStore.uploadCover(coverFile.value)
+    }
+    const pdfKey = await uploadStore.uploadPdf(pdfFile.value)
+
+    // 2. Create project in RDS — send keys, never full URLs
     await uploadStore.submitProject({
       title: title.value,
       description: description.value,
-      demoUrl: demoUrl.value.trim() || null,
-      tags: parsedTags,
-      coverFile: coverFile.value,
-      pdfFile: pdfFile.value,
+      demoUrl: demoUrl.value || null,
+      tags: parseTags(tagsInput.value),
+      coverImageKey: coverKey,
+      pdfKey,
     })
     
     isSuccess.value = true
@@ -205,9 +183,9 @@ async function handleSubmit() {
             <input
               id="demo-url"
               v-model="demoUrl"
-              type="text"
+              type="url"
               :disabled="isSubmitting"
-              placeholder="google.com (or full link)"
+              placeholder="https://your-demo.vercel.app"
               class="bg-card text-card-foreground border-2 border-border rounded-none focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background px-4 py-2 w-full font-mono disabled:opacity-50"
             />
           </div>

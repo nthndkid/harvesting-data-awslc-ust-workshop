@@ -47,10 +47,8 @@ export const useUploadStore = defineStore('upload', () => {
     description: string
     demoUrl: string | null
     tags: string[]
-    coverFile?: File | null
-    pdfFile?: File | null
-    coverImageKey?: string | null
-    pdfKey?: string | null
+    coverImageKey: string | null
+    pdfKey: string | null
   }) {
     uploading.value = true
     error.value = null
@@ -58,36 +56,17 @@ export const useUploadStore = defineStore('upload', () => {
       const userId = localStorage.getItem('ph_userid')
       if (!userId) throw new Error('YOU MUST BE LOGGED IN TO SUBMIT A PROJECT')
 
-      // Use FormData for atomic multipart upload if files are present
-      if (payload.coverFile || payload.pdfFile) {
-        const formData = new FormData()
-        formData.append('title', payload.title)
-        formData.append('description', payload.description)
-        formData.append('demoUrl', payload.demoUrl || "")
-        formData.append('tags', payload.tags.join(', '))
-        formData.append('userId', userId)
-        
-        if (payload.coverFile) formData.append('coverFile', payload.coverFile)
-        if (payload.pdfFile) formData.append('pdfFile', payload.pdfFile)
-        
-        // api (Axios instance) handles FormData automatically
-        const { data } = await api.post('/projects', formData)
-        
-        const missionStore = useMissionStore()
-        missionStore.completeMission('UPLOAD')
-        return data
-      }
-
-      // Fallback to JSON for legacy two-step flow
       const backendPayload = {
         title: payload.title,
         description: payload.description,
-        demoUrl: payload.demoUrl || "", 
+        demoUrl: payload.demoUrl || "", // Send empty string instead of null to pass validation
         tags: payload.tags.join(', '), 
-        coverImageKey: payload.coverImageKey || undefined,
+        coverImageKey: payload.coverImageKey || undefined, // undefined for optional fields
         pdfKey: payload.pdfKey || undefined,
         userId: userId
       }
+
+      console.log('Sending project payload:', backendPayload)
 
       const { data } = await api.post('/projects', backendPayload)
       

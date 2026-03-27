@@ -9,13 +9,6 @@ export const useAuthStore = defineStore('auth', () => {
   
   // App is considered authenticated if we have a name (offline/online)
   const isAuthenticated = computed(() => username.value !== null)
-  
-  // Helper to check if the current userId is a valid UUID (comes from backend)
-  const isUserIdUuid = computed(() => {
-    if (!userId.value) return false
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-    return uuidRegex.test(userId.value)
-  })
 
   // 🌐 Workshop simplified login: Strictly by name
   async function setUsername(name: string) {
@@ -87,5 +80,5 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.setItem('ph_username', name)
   }
 
-  return { username, userId, isAuthenticated, isUserIdUuid, loading, setUsername, register, login, logout, tryAutoLogin }
+  return { username, userId, isAuthenticated, loading, setUsername, register, login, logout, tryAutoLogin }
 })
