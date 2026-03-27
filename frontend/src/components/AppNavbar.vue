@@ -55,7 +55,7 @@ onMounted(() => {
         class="hidden sm:flex items-center gap-2 bg-background border-2 border-border px-3 py-1.5 hover:bg-muted font-bold text-xs uppercase shadow-[2px_2px_0px_var(--shadow)] hover:-translate-x-[2px] hover:-translate-y-[2px] hover:shadow-[4px_4px_0px_var(--shadow)] active:translate-x-0 active:translate-y-0 active:shadow-none transition-all duration-200 text-foreground"
       >
         <Trophy :size="14" class="text-primary" />
-        {{ missionStore.progressCount }} / 7 MISSIONS
+        {{ missionStore.progressCount }} / 8 MISSIONS
       </button>
 
       <!-- Navigation links -->

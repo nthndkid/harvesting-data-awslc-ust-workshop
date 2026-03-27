@@ -10,6 +10,7 @@ import CommentItem from '@/components/CommentItem.vue'
 // ─── Store imports ──────────────────────────────────────────────────────────
 import { useAuthStore } from '@/stores/auth'
 import { useProjectsStore } from '@/stores/projects'
+import { useMissionStore } from '@/stores/mission'
 import {
   User,
   Image as ImageIcon,
@@ -27,6 +28,7 @@ const id = route.params.id as string
 // ─── Store access ───────────────────────────────────────────────────────────
 const { username } = storeToRefs(useAuthStore())
 const projectsStore = useProjectsStore()
+const missionStore = useMissionStore()
 
 // ─── Data source ────────────────────────────────────────────────────────────
 const project = ref<Project | null>(null)
@@ -110,6 +112,8 @@ async function handleCommentSubmit() {
     comments.value.unshift(newComment)
     // Clear the textarea
     newCommentBody.value = ''
+    // 🏆 MISSION: Valuable Contributor
+    missionStore.completeMission('COMMENT')
   } catch (e) {
     alert('Failed to post comment')
     console.error(e)
