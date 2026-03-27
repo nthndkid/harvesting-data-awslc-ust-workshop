@@ -8,8 +8,9 @@ import { db } from '../db'
 import { eq, sql } from 'drizzle-orm'
 import { users, projects, likes, comments as commentsTable } from '../db/schema'
 import { logAccess, logData } from '../lib/dynamo'
-import { createProjectSchema, ProjectIdParamsSchema, ErrorSchema, SuccessMessageSchema } from '../lib/validators'
-import { getPresignedUrl } from '../lib/s3'
+import { createProjectSchema, ProjectIdParamsSchema, ErrorSchema, SuccessMessageSchema, CreateProjectMultipartSchema } from '../lib/validators'
+import { getPresignedUrl, uploadToS3 } from '../lib/s3'
+import { randomUUID } from 'crypto'
 
 // Export router securely
 
@@ -137,7 +138,12 @@ const createProjectRoute = createRoute({
   tags: ['Projects'],
   security: [{ UserIdHeader: [] }],
   request: {
-    body: { content: { 'application/json': { schema: createProjectSchema } } }
+    body: { 
+      content: { 
+        'application/json': { schema: createProjectSchema },
+        'multipart/form-data': { schema: CreateProjectMultipartSchema }
+      } 
+    }
   },
   responses: {
     201: {
@@ -156,32 +162,71 @@ const createProjectRoute = createRoute({
 })
 
 router.openapi(createProjectRoute, async (c) => {
-  const body = c.req.valid('json')
-  
   try {
+    const contentType = c.req.header('content-type')
+    let projectData: any
+    let coverFile: File | undefined
+    let pdfFile: File | undefined
+
+    if (contentType?.includes('multipart/form-data')) {
+      // 🚀 ATOMIC: Handled here if multipart data sent
+      const body = await c.req.parseBody()
+      
+      // Step 1: Pre-validate metadata before S3 uploads
+      const validation = CreateProjectMultipartSchema.safeParse(body)
+      if (!validation.success) {
+        const fieldErrors = validation.error.flatten().fieldErrors
+        const firstErrorKey = Object.keys(fieldErrors)[0]
+        const firstErrorMessage = fieldErrors[firstErrorKey as keyof typeof fieldErrors]?.[0]
+        return c.json({ error: `${firstErrorKey}: ${firstErrorMessage}` || 'Validation failed' }, 400)
+      }
+      
+      projectData = validation.data
+      coverFile = body.coverFile as File
+      pdfFile = body.pdfFile as File
+      
+      // Step 2: S3 Uploads (only after validation passes)
+      if (coverFile) {
+        const coverKey = `covers/${randomUUID()}-${coverFile.name}`
+        const arrayBuffer = await coverFile.arrayBuffer()
+        await uploadToS3(coverKey, Buffer.from(arrayBuffer), coverFile.type)
+        projectData.coverImageKey = coverKey
+      }
+      
+      if (pdfFile) {
+        const pdfKey = `pdfs/${randomUUID()}-${pdfFile.name}`
+        const arrayBuffer = await pdfFile.arrayBuffer()
+        await uploadToS3(pdfKey, Buffer.from(arrayBuffer), pdfFile.type)
+        projectData.pdfKey = pdfKey
+      }
+    } else {
+      // Standard JSON flow
+      projectData = c.req.valid('json')
+    }
+
     // RDS: insert new project
     const [newProject] = await db.insert(projects).values({
-      title: body.title,
-      description: body.description,
-      tags: body.tags,
-      userId: body.userId,
-      coverImageKey: body.coverImageKey,
-      pdfKey: body.pdfKey,
-      demoUrl: body.demoUrl
+      title: projectData.title,
+      description: projectData.description,
+      tags: projectData.tags,
+      userId: projectData.userId,
+      coverImageKey: projectData.coverImageKey,
+      pdfKey: projectData.pdfKey,
+      demoUrl: projectData.demoUrl
     }).returning()
 
     // DynamoDB: database event log
     await logData({
-      userId: body.userId,
+      userId: projectData.userId,
       action: 'CREATE',
       resourceId: newProject.projectId,
       entityType: 'PROJECT'
     })
 
     return c.json(newProject, 201)
-  } catch (error) {
+  } catch (error: any) {
     console.error('POST /projects failed:', error)
-    return c.json({ error: 'Failed to create project' }, 500)
+    return c.json({ error: error.message || 'Failed to create project' }, 500)
   }
 })
 
